@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>青年公寓服务系统（本科毕设）· 程烁作品集</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-back" href="../index.html">← 返回首页</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<header class="d-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../index.html">首页</a> / 青年公寓服务系统</div>
+    <h1>青年公寓服务系统</h1>
+    <p class="lede">本科毕业设计（计算机科学与技术），前后端分离的完整全栈项目：Spring Boot + MyBatis-Plus + MySQL + Redis 后端，Vue3 + Element Plus + Vite 前端。覆盖用户管理、房源管理、在线预订、合同生成、缴费记录全业务链路。</p>
+    <div class="meta">
+      <span>Spring Boot</span>
+      <span>Vue3</span>
+      <span>MyBatis-Plus</span>
+      <span>MySQL + Redis</span>
+      <span>JWT + RBAC</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="d-grid">
+      <div class="d-card glass reveal">
+        <h3>项目背景</h3>
+        <p>城市化进程加快、青年群体流动性增强，青年公寓成为城市青年解决住房问题的重要选择。传统公寓管理依赖人工或通用系统，在房源信息管理、租客身份核验、在线预订缴费上效率低、信息不透明、体验差。本系统为中小型青年公寓的数字化转型提供完整方案。</p>
+      </div>
+      <div class="d-card glass reveal">
+        <h3>项目亮点</h3>
+        <p>不是"增删改查"级别：集成<b>第三方实名认证</b>实现年龄自动核验；用 <b>Spring State Machine</b> 管理房源生命周期；<b>RBAC</b> 三角色权限；敏感信息（密码、身份证号）加密存储；通过功能测试与性能测试。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">architecture</div>
+      <h2>系统架构</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>前端 Vue3 + Element Plus + Vite</div>
+        <div><span class="p">$ </span>axios 请求 → JWT 鉴权</div>
+        <div><span class="p">$ </span>Spring Boot Controller / Service / Mapper</div>
+        <div><span class="p">$ </span>MyBatis-Plus 持久层 → MySQL 业务数据 + Redis 缓存</div>
+        <div><span class="o">[+] </span>前后端分离部署, 角色: 管理员 / 管家 / 租客</div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">modules</div>
+      <h2>功能模块</h2>
+      <div class="d-grid">
+        <div class="d-card glass">
+          <h3>用户管理</h3>
+          <p>注册登录、实名认证、身份信息加密存储，年龄自动核验确保租客身份真实有效。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>房源管理</h3>
+          <p>房源信息的发布、编辑、上下架，生命周期状态机流转：待租 → 已租 → 退租，全程可追溯。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>在线预订</h3>
+          <p>租客在线预约看房、预订房源，订单状态与房源状态联动，避免重复预订。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>合同生成</h3>
+          <p>预订通过后自动生成合同，签约流程线上化，合同状态纳入状态机统一管理。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>缴费记录</h3>
+          <p>租金、水电等缴费记录线上化，账单明细可查，支持按租客与房源维度追溯。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>权限控制</h3>
+          <p>RBAC 权限模型：管理员、管家、租客三角色分级访问，接口层 JWT 鉴权拦截。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">core design</div>
+      <h2>核心设计</h2>
+      <div class="d-grid">
+        <div class="d-card glass">
+          <h3>Spring State Machine 状态机</h3>
+          <p>房源从"待租"到"已租"再到"退租"的完整生命周期由状态机驱动，非法流转被拦截，流转历史可追溯。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>实名认证 + 年龄核验</h3>
+          <p>集成第三方实名认证接口，自动校验租客年龄与身份真实性，从源头过滤违规入住。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>数据安全</h3>
+          <p>用户密码、身份证号等敏感信息加密存储，接口层 JWT 令牌鉴权，保障多端会话安全。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>前后端分离</h3>
+          <p>Vue3 + Element Plus 构建界面，Spring Boot 提供 RESTful API，Vite 工程化构建，独立部署。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">repo</div>
+      <h2>GitHub 仓库</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>git clone https://github.com/chengshuo-bxc/青年公寓服务系统</div>
+        <div><span class="o">[+] </span>完整前后端源码, 含数据库初始化脚本与部署说明</div>
+      </div>
+      <div style="margin-top:18px">
+        <a class="cta" href="https://github.com/chengshuo-bxc/%E9%9D%92%E5%B9%B4%E5%85%AC%E5%AF%93%E6%9C%8D%E5%8A%A1%E7%B3%BB%E7%BB%9F" target="_blank" rel="noopener">打开 GitHub 仓库</a>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">result</div>
+      <h2>产出结果</h2>
+      <div class="d-grid">
+        <div class="d-card glass">
+          <h3>测试通过</h3>
+          <p>功能测试 + 性能测试完成，各项功能运行正常，可满足青年公寓日常管理需求。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>工程完整</h3>
+          <p>从需求分析、数据库设计、接口开发到前端界面与测试部署，完整走通全栈开发流程，论文 32 页系统阐述设计与实现。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找爬虫 / 数据采集方向的机会</div>
+          <div style="margin-top:22px" class="reveal"><a class="cta" href="mailto:18975560804@163.com">联系我</a></div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> 数据采集 · JS 逆向 · AI 驱动开发</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫工程师作品集</span>
+        <span><a href="../index.html" style="color:var(--dim)">← 返回首页</a></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+</body>
+</html>

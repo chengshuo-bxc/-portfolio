@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>题材库 · 题材掘金逆向 · 程烁作品集</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-back" href="../index.html">← 返回首页</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<header class="d-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../index.html">首页</a> / 题材库 · 题材掘金逆向</div>
+    <h1>题材库 · 题材掘金逆向</h1>
+    <p class="lede">把题材小程序"大题材 → 小题材 → 股票"的整套接口逆向出来，用 Python 脚本直接拉数据，不依赖小程序。链路：微信加密包解包 → 静态分析定位接口 → mitmproxy 抓包 → WASM AES 响应解密。</p>
+    <div class="meta">
+      <span>735 个题材全量拉通</span>
+      <span>244 个源码文件</span>
+      <span>WASM 解密</span>
+      <span>发现 OSS 密钥泄露</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="d-grid">
+      <div class="d-card glass reveal">
+        <h3>项目背景</h3>
+        <p>面试官给的题材小程序逆向任务。目标是"大题材 → 小题材 → 股票"递归数据全量拉通，产出不依赖小程序的独立脚本。</p>
+      </div>
+      <div class="d-card glass reveal">
+        <h3>核心难点</h3>
+        <p>响应是整体 <b>AES 加密</b>，密钥编译进包内的 <b>WASM</b>，JS 层完全不碰密钥；且有隐蔽环境校验（Referer + UA），token 对了也会 401。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">reverse process</div>
+      <h2>逆向过程（四步）</h2>
+      <div class="d-card glass" style="margin-top:16px">
+        <ul>
+          <li><b>挖包</b>：从 PC 微信 4.x 缓存找到小程序 .wxapkg 加密包（appid: wx58eec6edd22c0ba2，靠 _pagesStock_ 分包名锁定）</li>
+          <li><b>解包</b>：V1MMWX 加密格式，用 AppID 做 PBKDF2 派生密钥 + AES-256 + XOR，解出 244 个源码文件</li>
+          <li><b>找接口</b>：静态分析定位域名 app.txcfgl.com/api，题材接口一套：/app/subject/list（735 个）、/app/subject/child-stock-tree/{id}（递归树）</li>
+          <li><b>抓包解密</b>：mitmproxy 抓真实 token 和调用链；响应 AES 加密，用 wasmtime 直接跑小程序自带的 aes_decryptor.wasm，链路全通</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">core code</div>
+      <h2>核心代码（真实实现 + 注释）</h2>
+      <p class="code-note">逆向思路核心：<b>不去逆密钥，直接复用目标自己的能力（跑它自己的 wasm）</b>，结果最一致也最稳。</p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">wasm_decrypt.py</span>
+        </div>
+        <pre class="codewin-body"><code># [逆向要点] 响应 AES 加密, 密钥编译在包里, JS 层不碰密钥
+# 破法: 不去逆密钥, 直接用 wasmtime 跑小程序自带的 aes_decryptor.wasm
+import wasmtime, os
+
+def _get_module():
+    # 从解包产物 raw/ 目录加载小程序自己的 wasm
+    wasm = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "raw", "aes_decryptor.wasm"), "rb").read()
+    return wasmtime.Module(wasmtime.Engine(), wasm)
+
+def decrypt_hex(hex_str):
+    module = _get_module()
+    store = wasmtime.Store(wasmtime.Engine())
+    i32 = wasmtime.ValType.i32()
+    # 注入两个空函数, 满足 wasm 导入(小程序内部实现, 不影响解密)
+    a_a = wasmtime.Func(store, wasmtime.FuncType([i32, i32, i32], [i32]), lambda a, b, c: 0)
+    a_b = wasmtime.Func(store, wasmtime.FuncType([i32], [i32]), lambda a: 0)
+    inst = wasmtime.Instance(store, module, [a_a, a_b])
+    exports = inst.exports(store)
+    mem = exports["c"]; malloc = exports["f"]; free = exports["g"]
+    decrypt = exports["e"]; free_memory = exports["i"]
+
+    raw = hex_str.strip().strip('"').encode("ascii")
+    ptr = malloc(store, len(raw) + 1)          # wasm 内存里分配密文空间
+    mem.write(store, raw + b"\x00", ptr)       # 写入密文
+    out_ptr = decrypt(store, ptr)              # 调用它自己的解密函数
+    free(store, ptr)
+    if out_ptr == 0:
+        raise ValueError("解密失败")
+    chunks = []; off = out_ptr
+    while True:                                # 读明文直到 \x00
+        b = mem.read(store, off, off + 1)
+        if b == b"\x00": break
+        chunks.append(b); off += 1
+    free_memory(store, out_ptr)
+    return b"".join(chunks).decode("utf-8")    # 明文 JSON
+</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">security finding</div>
+      <h2>附加发现（安全审计）</h2>
+      <div class="d-grid">
+        <div class="d-card glass tinted">
+          <h3>硬编码阿里云 OSS 密钥</h3>
+          <p>小程序配置里硬编码了 AccessKeyId / Secret，属于敏感信息泄露，攻击者可直接读写 OSS bucket。已标注风险并记录在复盘文档。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>隐蔽环境校验</h3>
+          <p>请求必须带 Referer: servicewechat.com/{appid} + MiniProgramEnv/Windows 的 UA，否则 token 对了也返回 401。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">run</div>
+      <h2>运行命令</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>python fetch_themes.py --detail 9012323</div>
+        <div><span class="p">$ </span>python wasm_decrypt.py &lt;hex或文件路径&gt;</div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">result</div>
+      <h2>产出结果</h2>
+      <div class="d-grid">
+        <div class="d-card glass">
+          <h3>735 个题材全量拉通</h3>
+          <p>"银行"下 15 个小题材（万亿俱乐部、江苏地方银行…），每只都有股票，递归树一次返回。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>不依赖小程序</h3>
+          <p>独立 Python 脚本直接拉数据，样例数据与完整复盘在项目目录留档。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找爬虫 / 数据采集方向的机会</div>
+          <div style="margin-top:22px" class="reveal"><a class="cta" href="mailto:18975560804@163.com">联系我</a></div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> 数据采集 · JS 逆向 · AI 驱动开发</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫工程师作品集</span>
+        <span><a href="../index.html" style="color:var(--dim)">← 返回首页</a></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+</body>
+</html>

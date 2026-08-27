@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>股市量化分析智能平台 · 程烁作品集</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-back" href="../index.html">← 返回首页</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<header class="d-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../index.html">首页</a> / 股市量化分析智能平台</div>
+    <h1>股市量化分析智能平台</h1>
+    <p class="lede">整合中证指数、Wind、彭博、东方财富、同花顺公开数据，构建覆盖股价、财报、K线、资金流向、股东信息的多维股市量化库。我负责东方财富采集：9 大榜单 + K线，接口逆向 + 频率限流对抗，双表入库定时增量。</p>
+    <div class="meta">
+      <span>东方财富 9 大榜单</span>
+      <span>push2 接口逆向</span>
+      <span>K线 日/周/月</span>
+      <span>MySQL 双表 upsert</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="d-grid">
+      <div class="d-card glass reveal">
+        <h3>项目背景</h3>
+        <p>为金融机构建股市量化分析库，数据源含中证指数、Wind、彭博、东方财富、同花顺。榜单页面是"壳"，数据全部由 JS 动态加载，需要监听真实接口。</p>
+      </div>
+      <div class="d-card glass reveal">
+        <h3>核心难点</h3>
+        <p>反爬是<b>频率型 IP 限流</b>：短时高频请求 push2 / push2delay / push2his 全部域名断连，封禁可达数十分钟，只能等冷却，必须低频 + 重试 + 备用域名。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">reverse process</div>
+      <h2>逆向过程</h2>
+      <div class="d-card glass" style="margin-top:16px">
+        <ul>
+          <li>浏览器监听 XHR，定位真实接口：push2.eastmoney.com/api/qt/clist/get（无签名）</li>
+          <li>梳理榜单与 fs 参数映射：A+H股比价 b:DLMK0101、创业板 m:0+t:80 等，po 控制涨/跌幅</li>
+          <li>实测限流规则：主域名高频断连，备用域名 push2delay（延迟行情）通常可用</li>
+          <li>字段坑：fltt=1 返回"分"单位，必须 fltt=2 才返回浮点元</li>
+          <li>采集节奏：每榜请求间隔 3 秒，失败指数退避（5s / 10s / 15s / 20s），不硬冲</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">core code</div>
+      <h2>核心代码（真实实现 + 注释）</h2>
+      <p class="code-note">双域名轮换 + 退避重试，是稳定采集的关键；<b>[逆向要点]</b> 标记处为实测结论。</p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">spiders/eastmoney/run.py</span>
+        </div>
+        <pre class="codewin-body"><code># [逆向要点] 榜单接口: push2.eastmoney.com/api/qt/clist/get
+# 无签名, 关键参数 fs(榜单类别) + po(涨/跌幅) + fltt(浮点元)
+API_HOSTS = [
+    "https://push2.eastmoney.com/api/qt/clist/get",      # 主域名
+    "https://push2delay.eastmoney.com/api/qt/clist/get", # 备用域名: 主域名被限流时切换
+]
+
+# 榜单配置: 名称 -> (fs 参数, 是否分涨跌幅榜)
+BOARDS = {
+    "A+H股比价": {"fs": "b:DLMK0101", "directions": [None]},
+    "国企股":     {"fs": "b:DLMK0102", "directions": ["涨幅榜", "跌幅榜"]},
+    "红筹股":     {"fs": "b:DLMK0103", "directions": ["涨幅榜", "跌幅榜"]},
+    "蓝筹股":     {"fs": "b:DLMK0105", "directions": ["涨幅榜", "跌幅榜"]},
+    "创业板":     {"fs": "m:0+t:80",   "directions": ["涨幅榜", "跌幅榜"]},
+}
+
+# [逆向要点] 反爬=频率型 IP 限流: 短时高频直接断连, 冷却数十分钟
+# 对策: 双域名轮换 + 每轮退避递增, 绝不硬冲
+def fetch_board(fs, po, pz, tries=4):
+    for i in range(tries):
+        for api in API_HOSTS:
+            try:
+                r = requests.get(api, params={
+                    "np": 1, "fltt": 2, "invt": 2, "fs": fs,
+                    "fields": FIELDS, "fid": "f3", "pn": 1, "pz": pz, "po": po,
+                    "ut": "fa5fd1943c7b386f172d6893dbfba10b",
+                }, headers=DEFAULT_HEADERS, timeout=TIMEOUT)
+                return r.json()
+            except Exception:
+                continue
+        print(f"请求失败(第{i+1}轮), 退避 {5*(i+1)}s")
+        time.sleep(5 * (i + 1))      # 指数退避, 不硬冲
+    return {}
+
+def collect(board_name, pz):
+    cfg = BOARDS[board_name]
+    for direction in cfg["directions"]:
+        po = 1 if direction == "涨幅榜" else (0 if direction == "跌幅榜" else 1)
+        d = fetch_board(cfg["fs"], po, pz)
+        diff = (d.get("data") or {}).get("diff") or []
+        for s in diff:
+            rec = clean_quote_record({   # 统一字段口径: 价格/涨跌幅/主力净流入/换手率/量比
+                "code": s.get("f12"), "name": s.get("f14"),
+                "price": s.get("f2"), "change_pct": s.get("f3"),
+                "main_inflow": s.get("f62"), "main_ratio": s.get("f184"),
+                "turnover": s.get("f8"), "vol_ratio": s.get("f10"),
+            })
+            get_store().save_quote(rec)  # MySQL upsert: 重复自动更新
+        time.sleep(3)                    # 低频: push2 高频会断连
+</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">run</div>
+      <h2>运行命令</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>python spiders/eastmoney/run.py --pz 20</div>
+        <div><span class="p">$ </span>python spiders/eastmoney/run.py --board 创业板</div>
+        <div><span class="p">$ </span>python spiders/eastmoney/kline.py --klt 102 --lmt 30</div>
+        <div><span class="p">$ </span>python scripts/run_daily.py</div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">result</div>
+      <h2>产出结果</h2>
+      <div class="d-grid">
+        <div class="d-card glass">
+          <h3>榜单全覆盖</h3>
+          <p>9 大榜单（A+H、国企、红筹、蓝筹、创业板），字段含代码/名称/价格/涨跌幅/主力净流入/净占比/换手率/量比。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>K线 + 双表入库</h3>
+          <p>push2his K线采集器（日/周/月），stock_quote + stock_kline 双表 upsert，定时增量脚本可挂 Windows 计划任务。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找爬虫 / 数据采集方向的机会</div>
+          <div style="margin-top:22px" class="reveal"><a class="cta" href="mailto:18975560804@163.com">联系我</a></div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> 数据采集 · JS 逆向 · AI 驱动开发</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫工程师作品集</span>
+        <span><a href="../index.html" style="color:var(--dim)">← 返回首页</a></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>大宗商品价格智能监测 · 程烁作品集</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-back" href="../index.html">← 返回首页</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<header class="d-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../index.html">首页</a> / 大宗商品价格智能监测</div>
+    <h1>大宗商品价格智能监测</h1>
+    <p class="lede">面向制造企业的大宗商品价格监测平台，聚合我的钢铁网、生意社等六大权威数据源。我的钢铁网 Api-Token 签名 + value 响应加密全破解（Python+Node.js 重构），生意社 HW_CHECK 破解，Scrapy-Redis 分布式。</p>
+    <div class="meta">
+      <span>双平台真实跑通</span>
+      <span>Api-Token 签名破解</span>
+      <span>AES-128-CBC 响应解密</span>
+      <span>Scrapy-Redis 分布式</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="d-grid">
+      <div class="d-card glass reveal">
+        <h3>项目背景</h3>
+        <p>覆盖有色金属、钢铁、建材、能源化工等多品类价格与库存，为企业实时成本监控、行情分析与采购决策提供数据支撑。</p>
+      </div>
+      <div class="d-card glass reveal">
+        <h3>核心难点</h3>
+        <p>我的钢铁网行情接口要 <b>Api-Token 签名</b>，且响应整体 <b>AES 加密</b>；生意社有 HW_CHECK cookie 挑战。逆向链路完整记录在 notes/逆向笔记.md。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">reverse process</div>
+      <h2>逆向过程</h2>
+      <div class="d-card glass" style="margin-top:16px">
+        <ul>
+          <li>从 price.mysteel.com/assets/request.0efb010a.js 定位签名生成逻辑</li>
+          <li>Api-Token 算法：MD5("path" + "/jgzx" + 业务路径 + "timestamp" + 毫秒 + "version1.0.0" + encrypt_key) 转大写</li>
+          <li>响应解密机制：isEncrypted=true 时，responseSecretKey / responseKeyOffset 分别是 AES-128-CBC 的密钥和 IV（base64），response 是密文</li>
+          <li>流程：先用 Node 子进程跑抽取的 JS 验证最快打通，再逐段重写为纯 Python，与浏览器真实请求 cURL 对比匹配</li>
+          <li>如实记录：SPA 价格接口对非会员返回 price=0（会员门禁），生产数据走 search.ms 公开接口（免登录真实价格）</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">core code</div>
+      <h2>核心代码（真实实现 + 注释）</h2>
+      <p class="code-note">请求签名 + 响应解密两段核心，<b>[逆向要点]</b> 标记处为实测结论。</p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/token_crypto.py</span>
+        </div>
+        <pre class="codewin-body"><code># [逆向要点1] Api-Token 签名: MD5(拼接串) 转大写
+# 密钥从前端 JS 提取, 拼法:
+# "path" + "/jgzx" + 业务路径 + "timestamp" + 毫秒时间戳 + "version1.0.0" + encrypt_key
+MYSTEEL = {
+    "app_key": "49B837D39D604919956FCE261BF50060",  # 普通通道 appKey
+    "encrypt_key": "d778f81f14774bc0",              # 加密通道签名密钥(逆向自前端)
+    "version": "1.0.0",
+    "base": "/avgprice/api/jgzx",
+}
+
+def mysteel_sign(plain):
+    import hashlib
+    return hashlib.md5(plain.encode()).hexdigest().upper()
+
+def get_api_token(url, params=None):
+    # [逆向要点] 时间戳必须与 token 同源(毫秒), 且一并填进请求参数
+    import time
+    ts = str(int(time.time() * 1000))
+    biz_path = url.replace(MYSTEEL["base"], "").split("?")[0]
+    token = mysteel_sign(
+        f"path/jgzx{biz_path}timestamp{ts}version{MYSTEEL['version']}{MYSTEEL['encrypt_key']}"
+    )
+    params["Timestamp"] = ts
+    params["Api-Token"] = token
+    return token
+
+# [逆向要点2] 响应 value 加密: AES-128-CBC
+# 密钥和 IV 直接藏在响应里(base64), response 是密文
+def decrypt_value(encrypted_value):
+    import base64
+    from Crypto.Cipher import AES
+    from Crypto.Util.Padding import unpad
+
+    if not encrypted_value.get("isEncrypted"):
+        return encrypted_value
+    key = base64.b64decode(encrypted_value["responseSecretKey"])  # AES 密钥
+    iv  = base64.b64decode(encrypted_value["responseKeyOffset"])  # IV
+    cipher = base64.b64decode(encrypted_value["response"])        # 密文
+    plain = unpad(AES.new(key, AES.MODE_CBC, iv=iv).decrypt(cipher), 16)
+    return json.loads(plain)                                      # 明文 JSON
+</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">run</div>
+      <h2>运行命令</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>python spiders/ppi100/run.py --pages 100</div>
+        <div><span class="p">$ </span>python spiders/ppi100/run.py --mode channel --channels 12,13</div>
+        <div><span class="p">$ </span>python spiders/mysteel/run.py --api</div>
+        <div><span class="p">$ </span>python visualization/charts.py --trend 铜,螺纹钢</div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">result</div>
+      <h2>产出结果</h2>
+      <div class="d-grid">
+        <div class="d-card glass">
+          <h3>我的钢铁网</h3>
+          <p>Api-Token + sign 签名算法、AES 响应解密全部破解并实测匹配；生产数据走 search.ms 公开接口（免登录真实价格）。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>生意社</h3>
+          <p>HW_CHECK cookie 挑战已破解；服务端渲染直出数据，实测 45+ 商品真实价格（Brent原油、硫酸铜、白油、甲醇等），支持按频道/商品/页数范围采集。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找爬虫 / 数据采集方向的机会</div>
+          <div style="margin-top:22px" class="reveal"><a class="cta" href="mailto:18975560804@163.com">联系我</a></div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> 数据采集 · JS 逆向 · AI 驱动开发</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫工程师作品集</span>
+        <span><a href="../index.html" style="color:var(--dim)">← 返回首页</a></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+</body>
+</html>

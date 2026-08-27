@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>时尚电商多平台商品监测 · 程烁作品集</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-back" href="../index.html">← 返回首页</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<header class="d-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../index.html">首页</a> / 时尚电商多平台商品监测</div>
+    <h1>时尚电商多平台商品监测</h1>
+    <p class="lede">给服装企业做市场洞察，抓义乌购、苏宁、淘宝 3 大平台商品数据。淘宝 sign 算法逆向闭环 + DrissionPage 登录态复用，自建代理池，全链路跑通 3102 条真实商品入库。</p>
+    <div class="meta">
+      <span>3102 条真实入库</span>
+      <span>单 IP 1258 请求零封禁</span>
+      <span>sign md5 闭环验证</span>
+      <span>自建代理池</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="d-grid">
+      <div class="d-card glass reveal">
+        <h3>项目背景</h3>
+        <p>电商 10 平台监测项目中的核心 3 平台（义乌购 / 苏宁易购 / 淘宝），采集商品信息、价格、规格、销量等关键数据，为服装企业提供市场洞察。</p>
+      </div>
+      <div class="d-card glass reveal">
+        <h3>核心难点</h3>
+        <p>淘宝 requests 直连直接被 <b>FAIL_SYS_USER_VALIDATE</b> 风控拦截（TLS 指纹），必须浏览器方案；三个平台反爬维度完全不同，需要三套方案。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">reverse process</div>
+      <h2>淘宝 sign 逆向过程</h2>
+      <div class="d-card glass" style="margin-top:16px">
+        <ul>
+          <li>抓包定位搜索接口：h5api.m.taobao.com/h5/mtop.taobao.wsearch.appsearch</li>
+          <li>下断点找 sign 生成函数，确认输入：token + t + appKey + data</li>
+          <li>还原算法：sign = md5(token & t & appKey & data字符串)，data 是紧凑 JSON（无空格、中文不转义）</li>
+          <li>Python 复刻后与浏览器请求的 sign 逐字对比，md5 一致才算闭环</li>
+          <li>token 来自登录态会话的 _m_h5_tk cookie，用 DrissionPage 登录一次，会话复用跳过反复验证码</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">core code</div>
+      <h2>核心代码（真实实现 + 注释）</h2>
+      <p class="code-note">完整 sign 算法 Python 复刻，<b>[逆向要点]</b> 标记处为关键结论。</p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">spiders/taobao/sign_solver.py</span>
+        </div>
+        <pre class="codewin-body"><code># [逆向要点] 淘宝 mtop 接口签名:
+# sign = md5( token & "&" & t & "&" & appKey & "&" & data字符串 )
+# data 字符串为 JSON 序列化(无空格、中文不转义), 与前端行为一致
+import hashlib, json, time
+
+APP_KEY = "12574478"
+H5API = "https://h5api.m.taobao.com/h5/{api}/{version}/"
+
+def build_data_str(data):
+    # 关键: separators 去掉空格, ensure_ascii=False 中文不转义
+    # 序列化不一致会导致 sign 对不上, 这是最容易踩的坑
+    return json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+
+def build_sign(token, t, data):
+    # [逆向要点] token 来自登录态会话的 _m_h5_tk cookie
+    # 拼接顺序不能变: token & t & appKey & data
+    raw = f"{token}&{t}&{APP_KEY}&{build_data_str(data)}"
+    return hashlib.md5(raw.encode()).hexdigest()
+
+def build_params(api, version, token, data):
+    # 组装完整 mtop 请求参数
+    t = str(int(time.time() * 1000))          # 毫秒时间戳
+    data_str = build_data_str(data)
+    return {
+        "jsv": "2.7.2",
+        "appKey": APP_KEY,
+        "t": t,
+        "sign": build_sign(token, t, data),   # 关键签名
+        "api": api,
+        "v": version,
+        "type": "jsonp",
+        "data": data_str,
+    }
+</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">run</div>
+      <h2>运行命令</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>python main.py crawl --keyword 女装 --limit 60</div>
+        <div><span class="p">$ </span>python spiders/suning/fill_price.py</div>
+        <div><span class="p">$ </span>python spiders/taobao/collector.py --keyword 女装</div>
+        <div><span class="p">$ </span>python -m proxy_pool.scheduler once</div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">result</div>
+      <h2>产出结果（2026-08-10 实测）</h2>
+      <div class="d-grid">
+        <div class="d-card glass">
+          <h3>义乌购 804 条</h3>
+          <p>csrf 头 + Referer + 1-2s 节流，单 IP 1258 请求零封禁（25.6 分钟，100% 成功）。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>苏宁 2277 条</h3>
+          <p>翻页 + rods 推荐 + generalForTile 批量补价（单请求上限 20 个，60% 命中）。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>淘宝 21 条</h3>
+          <p>sign 算法真实闭环 + 登录态复用 + 浏览器 DOM 抓取，绕过 TLS 指纹风控。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>全链路</h3>
+          <p>增量去重、价格历史、变动检出、六张市场洞察图，一条链路全部验证。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找爬虫 / 数据采集方向的机会</div>
+          <div style="margin-top:22px" class="reveal"><a class="cta" href="mailto:18975560804@163.com">联系我</a></div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> 数据采集 · JS 逆向 · AI 驱动开发</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫工程师作品集</span>
+        <span><a href="../index.html" style="color:var(--dim)">← 返回首页</a></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+</body>
+</html>

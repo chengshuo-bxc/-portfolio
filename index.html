@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>程烁 · 爬虫工程师 / JS 逆向 / AI 驱动开发</title>
+<meta name="description" content="程烁，两年爬虫开发，覆盖电商、大宗商品、房产、股市与金融题材。从 JS 逆向、分布式采集到入库全链路自研，并用 AI 驱动开发提效。">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<!-- ============ 导航 (悬浮玻璃条) ============ -->
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+    <span class="tag">crawler / reverse-engineer</span>
+  </div>
+  <div class="nav-links">
+    <a class="lnk" href="#skills">技能</a>
+    <a class="lnk" href="#projects">项目</a>
+    <a class="lnk" href="#ai">AI 驱动</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<!-- ============ Hero ============ -->
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <h1>把复杂数据源，拆成一条<span class="hl">稳定</span>采集链路</h1>
+      <p class="sub">两年爬虫开发，逆向、采集、入库全链路自己搭，覆盖电商、大宗、房产、股市与金融题材，AI 驱动开发提效。</p>
+      <div class="ctas">
+        <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+        <a class="cta ghost" href="#projects">查看项目</a>
+      </div>
+    </div>
+    <div class="term glass reveal">
+      <div class="term-bar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="tname">chengshuo@dev: ~</span>
+      </div>
+      <div class="term-body" id="heroTerm"></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ 数据条 ============ -->
+<section class="stats">
+  <div class="wrap">
+    <div class="stat glass reveal"><div class="num">10+</div><div class="lbl">平台反爬对抗经验</div></div>
+    <div class="stat glass reveal"><div class="num">3102</div><div class="lbl">电商真实数据入库</div></div>
+    <div class="stat glass reveal"><div class="num">735</div><div class="lbl">题材接口逆向</div></div>
+    <div class="stat glass reveal"><div class="num">2</div><div class="lbl">年爬虫开发</div></div>
+  </div>
+</section>
+
+<!-- ============ 技能 ============ -->
+<section id="skills">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <h2>技术栈与能力</h2>
+      <p>不是名词堆砌，每一条都有真实项目落地。</p>
+    </div>
+    <div class="bento">
+      <a class="cell a glass tinted reveal" href="projects/ecommerce.html">
+        <div class="t">数据采集</div>
+        <div class="d">Python / Scrapy / Requests / 协程与异步，覆盖多平台多品类真实抓取。</div>
+        <div class="tags"><span class="hot">Scrapy</span><span class="hot">Requests</span><span>协程异步</span><span>分布式</span></div>
+      </a>
+      <div class="cell b glass reveal">
+        <div class="t">JS 逆向</div>
+        <div class="d">AST 反混淆、加密参数与签名还原、Node/iv8 补环境、浏览器 Hook。</div>
+        <div class="tags"><span class="hot">AST</span><span class="hot">签名还原</span><span>Node/iv8</span><span>Hook</span></div>
+      </div>
+      <div class="cell c glass reveal">
+        <div class="t">浏览器自动化</div>
+        <div class="d">DrissionPage 优先，会话登录态复用，单账号日采万级。</div>
+        <div class="tags"><span class="hot">DrissionPage</span><span>Playwright</span><span>登录态复用</span></div>
+      </div>
+      <div class="cell d glass tinted reveal">
+        <div class="t">反爬对抗</div>
+        <div class="d">代理池、验证码、指纹检测、频率控制、字体加密，按平台分层应对。</div>
+        <div class="tags"><span class="hot">代理池</span><span class="hot">验证码</span><span>指纹</span><span>字体加密</span></div>
+      </div>
+      <div class="cell e glass reveal">
+        <div class="t">数据工程</div>
+        <div class="d">MySQL / MongoDB / Redis，清洗去重、增量更新、入库对账。</div>
+        <div class="tags"><span>MySQL</span><span>MongoDB</span><span>Redis</span><span>增量对账</span></div>
+      </div>
+      <div class="cell f glass reveal">
+        <div class="t">AI 驱动开发</div>
+        <div class="d">用 Claude / Codex 编排逆向与开发，自建逆向 MCP 工具链，产出实测验证。</div>
+        <div class="tags"><span class="hot">Claude</span><span class="hot">Codex</span><span>自建 MCP</span><span>43 个技能</span></div>
+      </div>
+      <div class="cell g glass reveal">
+        <div>
+          <div class="t">RPA 流程自动化</div>
+          <div class="d">影刀 RPA 高级证书持有者。与爬虫互补分工：复杂反爬和数据密集用代码，日常重复流程用 RPA 拖拽编排。</div>
+        </div>
+        <div class="tags"><span class="hot">影刀 RPA 高级证书</span><span>流程编排</span><span>控制台调度</span><span>异常处理</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 项目 (全部可点击进详情页) ============ -->
+<section id="projects">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <h2>项目实战</h2>
+      <p>简历项目系统复现，全部真实数据跑通。点击项目进入详情页，可看真实核心算法代码。</p>
+    </div>
+
+    <!-- 重点项目大卡 -->
+    <a class="proj-featured glass reveal" href="projects/quant.html">
+      <div class="proj">
+        <div class="pname">股市量化分析智能平台</div>
+        <div class="pdesc">整合中证指数、Wind、彭博、东方财富、同花顺公开数据，构建股价、财报、K线、资金流向、股东信息多维量化库。</div>
+        <div class="meta">
+          <span>东方财富 9 大榜单</span>
+          <span>push2 接口逆向</span>
+          <span>K线采集</span>
+          <span>MySQL 双表 upsert</span>
+        </div>
+        <div class="tags"><span>Scrapy</span><span>JS 逆向</span><span>定时增量</span></div>
+        <div class="go">查看详情</div>
+      </div>
+      <div class="pterm">
+        <div><span class="p">$ </span>python spiders/eastmoney/run.py --pz 20</div>
+        <div><span class="o">[+] </span>东方财富 9 大榜单，fs 参数体系，无签名</div>
+        <div><span class="o">[+] </span>频率型 IP 限流：备用域名 + 低频 + 退避</div>
+        <div><span class="o">[+] </span>stock_quote + stock_kline 双表入库 <span class="ok">[OK]</span></div>
+      </div>
+    </a>
+
+    <!-- 四宫格 -->
+    <div class="proj-grid">
+      <a class="proj-card glass reveal" href="projects/ecommerce.html">
+        <div class="pname">时尚电商多平台商品监测</div>
+        <p class="pdesc">义乌购、苏宁、淘宝 3 平台。淘宝 sign 算法逆向闭环，自建代理池。</p>
+        <div class="meta"><span>3102 条入库</span><span>单 IP 1258 请求零封禁</span></div>
+        <div class="tags"><span>Scrapy</span><span>DrissionPage</span><span>sign 逆向</span></div>
+        <div class="pterm"><div><span class="p">$ </span>python main.py crawl --keyword 女装</div></div>
+        <div class="go">查看详情</div>
+      </a>
+      <a class="proj-card glass reveal" href="projects/commodity.html">
+        <div class="pname">大宗商品价格智能监测</div>
+        <p class="pdesc">我的钢铁网、生意社。Api-Token 签名 + value 响应加密全破解。</p>
+        <div class="meta"><span>双平台跑通</span><span>签名 + AES 解密破解</span></div>
+        <div class="tags"><span>签名逆向</span><span>响应加密</span><span>Scrapy-Redis</span></div>
+        <div class="pterm"><div><span class="p">$ </span>python spiders/ppi100/run.py</div></div>
+        <div class="go">查看详情</div>
+      </a>
+      <a class="proj-card glass reveal" href="projects/house.html">
+        <div class="pname">全域房产智能监测</div>
+        <p class="pdesc">链家、贝壳 SSR 直采，安居客 fzq 签名纯 Python 生成，纯协议免浏览器。</p>
+        <div class="meta"><span>595 条入库</span><span>纯协议免浏览器</span></div>
+        <div class="tags"><span>SSR 直采</span><span>签名逆向</span><span>DrissionPage</span></div>
+        <div class="pterm"><div><span class="p">$ </span>python spiders/anjuke/run.py</div></div>
+        <div class="go">查看详情</div>
+      </a>
+      <a class="proj-card glass tinted reveal" href="projects/themes.html">
+        <div class="pname">题材库 · 题材掘金逆向</div>
+        <p class="pdesc">微信小程序加密包解包 + 接口逆向，WASM AES 响应解密，735 个题材全量拉通。</p>
+        <div class="meta"><span>735 个题材</span><span>244 个源码文件</span><span>WASM 解密</span></div>
+        <div class="tags"><span>小程序解包</span><span>WASM</span><span>mitmproxy 抓包</span></div>
+        <div class="pterm"><div><span class="p">$ </span>python fetch_themes.py --detail 9012323</div></div>
+        <div class="go">查看详情</div>
+      </a>
+      <a class="proj-card wide glass reveal" href="projects/apartment.html">
+        <div class="proj">
+          <div class="pname">青年公寓服务系统（本科毕设）</div>
+          <p class="pdesc">前后端分离的完整全栈项目：Spring Boot + MyBatis-Plus + MySQL + Redis 后端，Vue3 + Element Plus + Vite 前端。房源生命周期状态机、RBAC 多角色权限、实名认证年龄自动核验。</p>
+          <div class="meta"><span>Spring Boot</span><span>Vue3</span><span>RBAC 权限</span><span>Spring State Machine</span></div>
+          <div class="tags"><span>MyBatis-Plus</span><span>MySQL</span><span>Redis</span><span>JWT</span></div>
+          <div class="go">查看详情</div>
+        </div>
+        <div class="pterm">
+          <div><span class="p">$ </span>git clone https://github.com/chengshuo-bxc/青年公寓服务系统</div>
+          <div><span class="o">[+] </span>三端角色: 管理员 / 管家 / 租客</div>
+          <div><span class="o">[+] </span>房源状态机: 待租 → 已租 → 退租 可追溯</div>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ AI 驱动 ============ -->
+<section id="ai">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <h2>AI 驱动开发，是我的第二生产力</h2>
+      <p>不是把代码丢给 AI 跑完就完事。我的用法是：AI 负责分析、生成与提效，我负责验证、落地与兜底，产出全部实测。</p>
+    </div>
+    <div class="ai-grid">
+      <div class="ai-outcomes">
+        <div class="ai-outcome reveal">
+          <div class="mark">&gt;_</div>
+          <div>
+            <h3>逆向攻坚</h3>
+            <p>用 Claude / Codex 分析混淆代码、定位签名生成逻辑，Python 复现后与浏览器结果逐字节对比。</p>
+          </div>
+        </div>
+        <div class="ai-outcome reveal">
+          <div class="mark">&gt;_</div>
+          <div>
+            <h3>简历项目复现工作流</h3>
+            <p>把简历项目逐个系统复现，电商 3102 条、大宗双平台、房产 595 条、股市 9 榜单，全部真实数据验证。</p>
+          </div>
+        </div>
+        <div class="ai-outcome reveal">
+          <div class="mark">&gt;_</div>
+          <div>
+            <h3>自建 AI 工具链</h3>
+            <p>43 个逆向 / 爬虫技能 + 自建 Camoufox 反检测与 CloakBrowser 逆向双 MCP，让 AI 直接驱动浏览器做逆向。</p>
+          </div>
+        </div>
+        <div class="ai-outcome reveal">
+          <div class="mark">&gt;_</div>
+          <div>
+            <h3>实测闭环</h3>
+            <p>AI 生成的代码不盲信。sign 用 md5 匹配验证，接口用真实请求对比，跑通才上线。</p>
+          </div>
+        </div>
+        <div class="pipeline reveal">
+          <b>目标</b><span class="arr">→</span> AI 分析 <span class="arr">→</span> 生成代码 <span class="arr">→</span> 实测验证 <span class="arr">→</span> 上线
+        </div>
+      </div>
+      <div class="term glass reveal">
+        <div class="term-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="tname">ai-session log</span>
+        </div>
+        <div class="term-body" id="aiTerm"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ footer ============ -->
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找爬虫 / 数据采集方向的机会</div>
+          <div style="margin-top:22px" class="reveal">
+            <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+          </div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> 数据采集 · JS 逆向 · AI 驱动开发</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫工程师作品集</span>
+        <span>7 页 · 统一配色 · 玻璃拟态</span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="js/app.js"></script>
+<script>
+/* 首页终端台词 (真实项目数据) */
+var heroLines = [
+  {cmd:'whoami'},
+  {html:'<span class="c">程烁</span> / 爬虫工程师 / 数据采集与逆向'},
+  {cmd:'ls ~/projects'},
+  {html:'<span class="c">股市量化  电商  大宗商品  房产  题材逆向</span>'},
+  {cmd:'head -1 ~/skills.txt'},
+  {html:'python · js逆向 · 浏览器自动化 · 分布式 · 数据工程'},
+  {cmd:'python ai_workflow.py --verify'},
+  {html:'AI 产出实测验证, sign md5 一致 <span class="ok">[OK]</span>'}
+];
+var aiLines = [
+  {cmd:'claude "定位同花顺接口加密入口"'},
+  {html:'<span class="o">[+] </span>定位加密函数与调用链'},
+  {html:'<span class="o">[+] </span>Python 复现, 与浏览器结果一致 <span class="ok">[OK]</span>'},
+  {cmd:'codex "补全代理池调度"'},
+  {html:'<span class="o">[+] </span>采集-验证-Redis-分发闭环'},
+  {html:'<span class="o">[+] </span>单 IP 1258 请求零封禁 <span class="ok">[OK]</span>'},
+  {cmd:'claude "解题材小程序加密包"'},
+  {html:'<span class="o">[+] </span>V1MMWX 解包 + WASM AES 解密'},
+  {html:'<span class="o">[+] </span>735 个题材全量拉通 <span class="ok">[OK]</span>'}
+];
+window.__typeTerm('heroTerm', heroLines);
+window.__typeTerm('aiTerm', aiLines);
+</script>
+</body>
+</html>

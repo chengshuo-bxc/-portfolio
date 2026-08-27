@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>全域房产智能监测 · 程烁作品集</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-back" href="../index.html">← 返回首页</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<header class="d-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../index.html">首页</a> / 全域房产智能监测</div>
+    <h1>全域房产智能监测</h1>
+    <p class="lede">整合链家、贝壳、安居客等八大房产数据源，支撑区域定价参考、经纪人活跃度分析。链家/贝壳 SSR 低频直采，安居客 58 antibot 的 fzq cookie 纯 Python 生成，纯协议免浏览器，595 条入库。</p>
+    <div class="meta">
+      <span>595 条入库</span>
+      <span>fzq cookie 逆向</span>
+      <span>纯协议免浏览器</span>
+      <span>DrissionPage 兜底</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="d-grid">
+      <div class="d-card glass reveal">
+        <h3>项目背景</h3>
+        <p>为房产经纪公司建全域房源数据库，多平台房源、经纪人、成交记录，跨平台关联构建房源档案，支撑区域定价与门店运营洞察。</p>
+      </div>
+      <div class="d-card glass reveal">
+        <h3>核心难点</h3>
+        <p>安居客被 <b>58 antibot</b> 风控拦截（翻页弹验证码）；链家/贝壳用 Scrapy 直连会被 TLS 指纹拦截，必须换方案。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">reverse process</div>
+      <h2>安居客 fzq 逆向过程</h2>
+      <div class="d-card glass" style="margin-top:16px">
+        <ul>
+          <li>侦察：链家/贝壳是 SSR（服务端渲染），低频 requests 直采稳定；但 Scrapy 的 TLS 指纹被拦，改用 requests</li>
+          <li>安居客：被 58 antibot 拦，浏览器方案成本高、易弹极验滑块</li>
+          <li>逆向 fzq_js cookie：定位 58 antibot 的生成逻辑，确认兜底分支算法</li>
+          <li>算法还原：fzq = md5(时间戳 + namespace) + "_" + 时间戳 + "_0"，纯 Python 生成</li>
+          <li>实测：首页 + 翻页全通过、无验证码，纯协议直采免浏览器免人工过码</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">core code</div>
+      <h2>核心代码（真实实现 + 注释）</h2>
+      <p class="code-note">fzq cookie 生成，<b>[逆向要点]</b> 标记处为关键结论。</p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/token_crypto.py · make_anjuke_fzq</span>
+        </div>
+        <pre class="codewin-body"><code># [逆向要点] 58 antibot 的 fzq_js cookie 生成算法(兜底分支, 实测通过)
+# 签名 = MD5(时间戳 + namespace), 拼回 "_时间戳_版本"
+def make_anjuke_fzq(ts=None, namespace="anjuke_ershoufang_pc",
+                    version="0"):
+    # version="0" 走兜底算法; 若服务端收紧校验, 再复现主分支(version=24)指纹
+    ts = ts or str(int(_time.time() * 1000))
+    if version == "0":
+        sig = _hashlib.md5((ts + namespace).encode()).hexdigest()
+    else:
+        raise NotImplementedError("主分支(version=24)指纹拼接未复现")
+    return f"{sig}_{ts}_{version}"
+
+
+# 用法: requests 直连翻页, 带上生成的 cookie, 免浏览器免人工过码
+def collect(city_url, pages):
+    cookies = {"fzq_js_anjuke_ershoufang_pc": make_anjuke_fzq()}
+    for p in range(1, pages + 1):
+        url = LIST_TEMPLATE.format(page=p) if p > 1 else city_url
+        status, body, final_url = retry.run(url=url, cookies=cookies, headers=headers)
+        if status != 200 or any(m in final_url.lower() for m in VERIFY_MARKS):
+            continue    # 被拦就跳过, 不硬闯
+        rows = parse_anjuke(body, "anjuke", "shanghai")
+        for r in rows:
+            rec = clean_house_record(r)
+            get_store().save_house(rec)      # MySQL upsert
+        time.sleep(delay)                    # 低频
+</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">run</div>
+      <h2>运行命令</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>python spiders/anjuke/run.py --pages 10</div>
+        <div><span class="p">$ </span>python spiders/lianjia/run.py --city zz --pages 5</div>
+        <div><span class="p">$ </span>python spiders/beike/run.py --city sh --pages 5</div>
+        <div><span class="p">$ </span>python visualization/charts.py --district-bar --price-hist</div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">result</div>
+      <h2>产出结果（2026-08 实测）</h2>
+      <div class="d-grid">
+        <div class="d-card glass">
+          <h3>链家 34 条</h3>
+          <p>SSR 低频直采，requests 绕过 Scrapy TLS 指纹拦截，3 秒间隔实测稳定。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>贝壳 30 条</h3>
+          <p>SSR 结构同族不同（嵌套 li），requests 低频直采。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>安居客 595 条</h3>
+          <p>fzq cookie 纯 Python 生成，纯协议直采免浏览器，翻页零验证码。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>方案沉淀</h3>
+          <p>DrissionPage 封装为兜底方案留存，58 系翻页若触发极验滑块可随时切换。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找爬虫 / 数据采集方向的机会</div>
+          <div style="margin-top:22px" class="reveal"><a class="cta" href="mailto:18975560804@163.com">联系我</a></div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> 数据采集 · JS 逆向 · AI 驱动开发</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫工程师作品集</span>
+        <span><a href="../index.html" style="color:var(--dim)">← 返回首页</a></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+</body>
+</html>
