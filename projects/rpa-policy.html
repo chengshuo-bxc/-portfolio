@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>政策文件定向归档 · RPA · 程烁作品集</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-back" href="../index.html">← 返回首页</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<header class="d-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../index.html">首页</a> / RPA / 政策归档</div>
+    <h1>行业政策文件定向采集与智能归档</h1>
+    <p class="lede">对标简历「行业政策文件定向采集与智能归档 RPA 系统」。本复现用中国政府网最新政策（免登录）：政策列表 + 详情正文采集，按领域/发布部门自动分类归档，生成摘要索引。实测 20 条归档。</p>
+    <div class="meta">
+      <span>gov.cn 免登录</span>
+      <span>领域自动分类</span>
+      <span>增量更新</span>
+      <span>摘要索引</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="d-grid">
+      <div class="d-card glass reveal">
+        <h3>项目背景</h3>
+        <p>政策法规每日更新，行业从业者要"发布后第一时间"拿到并按领域归档，替代人工每天逛官网检索下载。</p>
+      </div>
+      <div class="d-card glass reveal">
+        <h3>核心难点</h3>
+        <p>政府网站列表结构不规整；<code>#list-1-ajax-id li</code> 这种<b>后代组合 CSS 选择器又失效</b>（本项目第三次踩同一坑）；发布部门要从正文里识别，容易误抓（如"缴存比例由住房公积金管理委"）。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">xpath</div>
+      <h2>gov.cn 列表 + 详情正文</h2>
+      <p class="code-note"><b>[逆向要点]</b> DrissionPage 4.1 的后代组合 CSS（<code>#list-1-ajax-id li</code>）在多个站点都失效，但 xpath 稳定——这是本次复现踩出的一条通用规律。</p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">config.SOURCES · 中国政府网最新政策</span>
+        </div>
+        <pre class="codewin-body"><code>SOURCES = [{
+    "name": "中国政府网-最新政策",
+    "url": "https://www.gov.cn/zhengce/zuixin/",
+    # 组合 CSS '#list-1-ajax-id li' 失效 → xpath 直接抓政策链接最稳
+    "list_sel": "xpath://a[contains(@href, 'zhengce')]",
+    "title_sel": "",          # 空 = 用条目元素本身(即链接 a)
+    "link_sel":  "",
+    "date_sel":  "",
+    "detail_sel": "#UCAP-CONTENT",   # 详情正文容器 (实测 3700+ 字全文)
+}]</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">classify</div>
+      <h2>领域 + 部门自动分类</h2>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/classifier.py</span>
+        </div>
+        <pre class="codewin-body"><code># 领域分类: 标题+正文命中关键词 → 归档到对应子目录
+DOMAIN_RULES = {
+    '数字经济': ['数字化','人工智能','数据要素','软件'],
+    '能源环保': ['能源','电力','碳','环保','绿色'],
+    '科技产业': ['科技','创新','产业','制造'],
+    '民生医疗': ['医疗','教育','养老','住房'],
+}
+def classify_domain(title, text):
+    for domain, kws in DOMAIN_RULES.items():
+        if any(k in (title + text[:500]) for k in kws):
+            return domain
+    return '其他'
+
+# 归档路径: archive/{领域}/{部门}/{标题}.md  (文件自动重命名与分类存储)</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">result</div>
+      <h2>实测产出</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>[采集] 中国政府网-最新政策: 列表 20 条</div>
+        <div><span class="o">[+] </span>[能源环保] 国务院关于印发《"十五五"碳达峰行动方案》的通知</div>
+        <div><span class="o">[+] </span>[科技产业] 集成电路布图设计保护条例</div>
+        <div><span class="o">[+] </span>[数字经济] 国务院关于《扩大消费"十五五"规划》的批复</div>
+        <div><span class="o">[+] </span>[民生医疗] 中医药振兴发展"十五五"规划</div>
+        <div><span class="o">[+] </span>归档 20 条 → archive/{领域}/{部门}/xxx.md <span class="ok">[OK]</span></div>
+      </div>
+      <div class="d-card glass" style="margin-top:16px">
+        <h3>如实记录</h3>
+        <p>部门提取有误抓（正则从正文截到"缴存比例由住房公积金管理委"这类），当前标题+正文前段兜底可接受；后续可改成「标题优先 + 机构名白名单」。领域分类因为规则命中标题/正文，效果稳定。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">ai session</div>
+      <h2>我是怎么和 Claude 配合把它跑通的</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>列表页打开正常但 li 选择器取 0 → 贴给 Claude</div>
+        <div><span class="o">[+] </span>它提示: 跟新浪同样的坑, 后代 CSS 失效, 直接 xpath 抓 a <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>20 条跑完, 但部门提取有乱抓 → 问 Claude 怎么改进</div>
+        <div><span class="o">[+] </span>它建议标题优先 + 白名单 + 如实标注为待优化项 <span class="ok">[PLAN]</span></div>
+      </div>
+      <div class="d-card glass" style="margin-top:16px">
+        <p><b>体会</b>：到第四个 RPA 项目时，很多坑已经在前面踩过了（后代 CSS 失效、详情页正文容器）。Claude 的价值从"带你排错"升级到"<b>沉淀通用规律</b>"——它会把跨项目的经验串起来提醒你。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">run</div>
+      <h2>运行命令</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>python main.py once     # 采集一轮 → 分类归档 → 摘要索引</div>
+        <div><span class="p">$ </span>python main.py daemon   # 每6小时一轮(增量, URL去重)</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找自动化 / RPA / AI 提效方向的机会</div>
+          <div style="margin-top:22px" class="reveal"><a class="cta" href="mailto:18975560804@163.com">联系我</a></div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> RPA 流程自动化 · AI 驱动开发 · 数据采集</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫 / RPA 工程师作品集</span>
+        <span><a href="../index.html" style="color:var(--dim)">← 返回首页</a></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+</body>
+</html>

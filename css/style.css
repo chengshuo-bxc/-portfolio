@@ -382,6 +382,19 @@ footer{padding:72px 0 48px}
   .brand .tag{display:none}
 }
 
+/* ---------- 项目分组标签 (首页: 爬虫 / RPA 两方向) ---------- */
+.group-tag{
+  display:flex;align-items:center;gap:14px;
+  margin:52px 0 4px;
+  font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--dim);
+}
+.group-tag:first-child{margin-top:4px}
+.group-tag::before{content:'';height:1px;width:28px;background:var(--line)}
+.group-tag::after{content:'';height:1px;flex:1;background:var(--line)}
+.group-tag span{white-space:nowrap;color:var(--muted)}
+.group-tag b{color:var(--accent);font-weight:600}
+
 /* ---------- 减弱动效 ---------- */
 @media (prefers-reduced-motion:reduce){
   *{transition:none!important;animation:none!important}

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>招聘平台岗位采集 · RPA · 程烁作品集</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-back" href="../index.html">← 返回首页</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<header class="d-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../index.html">首页</a> / RPA / 招聘岗位采集</div>
+    <h1>招聘平台岗位信息自动化采集</h1>
+    <p class="lede">对标简历「招聘平台岗位信息自动化采集 RPA 系统」（原为影刀 RPA）。本复现用 Python + DrissionPage 免登录采集 51job：监听岗位接口拿 JSON（绕开 sign 签名）、破解页面无限 debugger 反调试、按关键词抓取岗位入库导出 Excel。</p>
+    <div class="meta">
+      <span>接口监听采集</span>
+      <span>反 debugger</span>
+      <span>39 条真实岗位</span>
+      <span>Excel 导出</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="d-grid">
+      <div class="d-card glass reveal">
+        <h3>项目背景</h3>
+        <p>HR / 运营要按关键词（爬虫工程师、Python 开发…）批量获取岗位的薪资、技能要求、公司信息，替代人工逐页复制。51job 是 Vue 单页应用，岗位由接口渲染，且搜索请求带 <code>sign</code> + <code>decode__1048</code> 加密参数。</p>
+      </div>
+      <div class="d-card glass reveal">
+        <h3>核心难点</h3>
+        <p>① 岗位列表是接口渲染，DOM 硬抓不靠谱；② 请求带签名不能直接 requests 打；③ 打开 F12 就触发<b>无限 debugger</b> 反调试（<code>function anonymous{...debugger;...}</code>），没法看 Network。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">find api</div>
+      <h2>用 F12 定位岗位接口（我自己上手）</h2>
+      <div class="d-card glass" style="margin-top:16px">
+        <ul>
+          <li>打开搜索页按 F12 → Network → 刷新 → 筛选 XHR → 看到 <code>we.51job.com/api/job/search-pc</code></li>
+          <li>接口带 <code>sign</code>（32 位 hex）+ <code>decode__1048</code> 加密参数 —— 直接 requests 会被拒</li>
+          <li>响应是完整 JSON：<code>jobName / provideSalaryString / jobSalaryMin / companyName / jobAreaString / workYearString / degreeString / jobTags / jobDescribe</code></li>
+          <li>响应里有 <code>totalCount</code>（上海爬虫工程师共 679 个岗位），<code>pageNum</code> 翻页</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">anti debugger</div>
+      <h2>破解无限 debugger（F12 一开就断）</h2>
+      <p class="code-note">页面埋了 <code>debugger;</code> 语句：只要开发者工具打开就不断暂停，无法看 Network。解法是页面加载前注入脚本，劫持 <code>Function</code> 构造器，把含 debugger 的代码直接过滤掉。<b>[逆向要点]</b></p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/api_client.py · ANTI_DEBUG</span>
+        </div>
+        <pre class="codewin-body"><code># [逆向要点] debugger 常由 new Function 生成(function anonymous), 劫持构造器清洗
+ANTI_DEBUG_SCRIPT = """
+(() => {
+  const clean = s => String(s).replace(/debugger\\s*;?/g, '');
+  const OF = window.Function;
+  const WF = function(...args) {
+    if (args.length) args[args.length - 1] = clean(args[args.length - 1]);
+    return OF(...args);
+  };
+  WF.prototype = OF.prototype;
+  window.Function = WF;
+  const OE = window.eval;
+  window.eval = function(code) { return OE(clean(code)); };
+})();
+"""
+# 用 CDP 在页面文档创建前注入, 之后 F12 随便开, 不再被断住
+page.run_cdp('Page.addScriptToEvaluateOnNewDocument', source=ANTI_DEBUG_SCRIPT)</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">listen api</div>
+      <h2>接口监听采集（绕开 sign 逆向）</h2>
+      <p class="code-note">不逆向签名——<b>让页面自己请求接口</b>（浏览器自带合法 sign），DrissionPage <code>listen</code> 监听响应直接拿 JSON。翻页点分页器，捕获新 pageNum 的响应。<b>[要点]</b></p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/api_client.py · ApiCollector</span>
+        </div>
+        <pre class="codewin-body"><code>self.page.listen.start('search-pc')          # 监听岗位接口
+self.page.get(search_url)
+for pkt in self.page.listen.steps(timeout=10):
+    body = pkt.response.body
+    items = body['resultbody']['job']['items']   # 直接拿 JSON 岗位
+    # 翻页: 点 .btn-next, 页面自动带 sign 请求 pageNum=N
+    # 监听再次捕获第 N 页数据, 循环到分页器 disabled 为止</code></pre>
+      </div>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>[采集] 第 1 页: 20 条 → 点击下一页 → 第 2 页: 20 条</div>
+        <div><span class="p">$ </span>[入库] 新增 39 条岗位（去重后）</div>
+        <div><span class="p">$ </span>[导出] 39 条 → output/岗位数据_20260901_2010.xlsx <span class="ok">[OK]</span></div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">ai session</div>
+      <h2>我是怎么和 Claude 配合把它跑通的</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>打开 F12 被 debugger 一直断住 → 我把断点代码贴给 Claude</div>
+        <div><span class="o">[+] </span>它认出是 function anonymous 特征 → 给劫持 Function/eval 的注入脚本 <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>我在 Network 找到 search-pc 接口, 但带 sign 不会逆 → 问 Claude</div>
+        <div><span class="o">[+] </span>它点明: 不用逆 sign, 让页面自己请求, listen 监听响应拿 JSON <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>薪资字段是字符串 "15000" 报错 → Claude 提示接口字段可能是 str, 容错 float</div>
+        <div><span class="o">[+] </span>salary 元/月 → K/月 换算, 全链路跑通 <span class="ok">[OK]</span></div>
+      </div>
+      <div class="d-card glass" style="margin-top:16px">
+        <p><b>体会</b>：这次是我亲手用 F12 定位的接口（不再怕 debugger），Claude 教我的关键一招是"<b>接口监听</b>"——不跟签名死磕，让浏览器当免费签名机，我只偷听响应。逆向难题的解法常常不是"更努力破解"，而是"换个角度绕开"。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">run</div>
+      <h2>运行命令</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>python main.py run      # 按 config.KEYWORDS 采集 → 入库 → Excel</div>
+        <div><span class="p">$ </span>python main.py export   # 仅导出 Excel</div>
+        <div><span class="p">$ </span>改 config: KEYWORDS(关键词) / JOB_AREA(上海 020000) / MAX_PAGES</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找自动化 / RPA / AI 提效方向的机会</div>
+          <div style="margin-top:22px" class="reveal"><a class="cta" href="mailto:18975560804@163.com">联系我</a></div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> RPA 流程自动化 · AI 驱动开发 · 数据采集</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫 / RPA 工程师作品集</span>
+        <span><a href="../index.html" style="color:var(--dim)">← 返回首页</a></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+</body>
+</html>

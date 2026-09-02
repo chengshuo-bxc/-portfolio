@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>本地生活商家采集 · RPA · 程烁作品集</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-back" href="../index.html">← 返回首页</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<header class="d-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../index.html">首页</a> / RPA / 商家采集</div>
+    <h1>本地生活平台商家信息批量采集</h1>
+    <p class="lede">对标简历「本地生活平台商家信息批量爬取 RPA 工具」（单小时采集超 2000 条线索）。本复现走高德开放平台 Web 服务 API（纯 requests 免登录）：按区域/品类筛选商家，自动校验有效性导出标准化表格。实测 2.6 万条/小时。</p>
+    <div class="meta">
+      <span>官方 API 免登录</span>
+      <span>176 条有效线索</span>
+      <span>2.6 万条/小时</span>
+      <span>电话有效性校验</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="d-grid">
+      <div class="d-card glass reveal">
+        <h3>项目背景</h3>
+        <p>本地服务业务拓展要批量拿商家线索（名称/地址/电话/评分）。原方案爬地图网页版，但本地生活平台反爬普遍严。</p>
+      </div>
+      <div class="d-card glass reveal">
+        <h3>为什么放弃爬页面</h3>
+        <p>实测三家全被挡：<b>高德网页版</b>弹 x5sec 滑块验证 iframe；<b>百度地图</b>只加载地图 UI、结果列表不渲染；<b>58同城</b>列表页要登录。→ 转 <b>高德开放平台官方 API</b>（个人免费 key，纯 requests，天然免反爬）。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">api</div>
+      <h2>高德 POI 搜索 API（纯 requests）</h2>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/collector.py · AmapCollector</span>
+        </div>
+        <pre class="codewin-body"><code># 高德 place/text: keywords=品类, city=城市码(310000 上海), offset=25/page 翻页
+while True:
+    data = requests.get(AMAP_API, params={
+        'key': AMAP_KEY, 'keywords': category,
+        'city': CITY_CODE, 'citylimit': 'true',
+        'offset': '25', 'page': str(page_no),
+        'extensions': 'all',          # all 才带扩展字段
+    }, timeout=15).json()
+    pois = data.get('pois', [])
+    if not pois or len(pois) < 25:    # 不足一页 = 到末页
+        break
+    for p in pois:
+        merchants.append({
+            'name': p.get('name'), 'address': p.get('address'),
+            'phone': (p.get('tel') or '').replace(';', ' '),  # 多电话分号分隔
+            'score': p.get('rating', ''),
+        })
+    page_no += 1</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">validate</div>
+      <h2>数据有效性校验（无效自动过滤）</h2>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/validator.py</span>
+        </div>
+        <pre class="codewin-body"><code>PHONE_PATTERN = r'(1[3-9]\d{9})|(0\d{2,3}-?\d{7,8})'  # 手机 或 座机
+
+def is_valid(m):
+    for f in ['name', 'address']:      # 必填字段缺一即无效
+        if not m.get(f): return False
+    phone = m.get('phone', '')
+    if phone and not re.search(PHONE_PATTERN, phone): return False  # 有电话但格式错
+    return True</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">result</div>
+      <h2>实测产出</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>[采集] 上海「口腔诊所」: 8 页 200 条 → [校验] 有效 177</div>
+        <div><span class="o">[+] </span>[入库] 176 条(去重) → 商家线索.csv (utf-8-sig, Excel 直接开)</div>
+        <div><span class="o">[+] </span>[速率] 24s 采集 176 条, 折合 26694 条/小时 <span class="ok">[OK]</span></div>
+        <div><span class="o">[+] </span>175/176 有电话; 数据含 口腔医院/诊所/门诊部 全量</div>
+      </div>
+      <div class="d-card glass" style="margin-top:16px">
+        <h3>如实记录</h3>
+        <p>高德 v3 POI 接口的 <code>rating</code> 字段实际不返回（评分不在该接口，需另接点评类 API）。核心字段名称/地址/电话完整，评分作为可扩展字段保留。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">ai session</div>
+      <h2>我是怎么和 Claude 配合把它跑通的</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>高德网页版弹 x5sec 滑块 iframe → 我截图/描述给 Claude</div>
+        <div><span class="o">[+] </span>它说这是阿里系 WAF, 网页版硬刚不划算 → 建议查官方开放平台 API</div>
+        <div><span class="o">[+] </span>给高德 place/text 接口文档要点 + 免费 key 申请路径 <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>翻页无限循环风险 → Claude 提示用 "len &lt; 25 = 末页" 做终止条件</div>
+        <div><span class="o">[+] </span>末页判断 + 速率统计落地, 一次跑通 <span class="ok">[OK]</span></div>
+      </div>
+      <div class="d-card glass" style="margin-top:16px">
+        <p><b>体会</b>：这个项目最大的决策点是"<b>别硬刚反爬</b>"。Claude 提醒我：当网页端三座大山（滑块/不渲染/登录墙）都在时，官方 API 才是正规解——免费、稳定、还能理直气壮写进简历。自动化的目标是把活干完，不是证明自己能破解一切。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">run</div>
+      <h2>运行命令</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>python main.py run     # 按 CATEGORIES 全采 → 校验 → CSV</div>
+        <div><span class="p">$ </span>python main.py export  # 仅导出 CSV</div>
+        <div><span class="p">$ </span>改 config: CATEGORIES(品类) / CITY_CODE / AMAP_KEY</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找自动化 / RPA / AI 提效方向的机会</div>
+          <div style="margin-top:22px" class="reveal"><a class="cta" href="mailto:18975560804@163.com">联系我</a></div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> RPA 流程自动化 · AI 驱动开发 · 数据采集</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫 / RPA 工程师作品集</span>
+        <span><a href="../index.html" style="color:var(--dim)">← 返回首页</a></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>公告研报聚合 · RPA · 程烁作品集</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-back" href="../index.html">← 返回首页</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<header class="d-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../index.html">首页</a> / RPA / 公告研报聚合</div>
+    <h1>上市公司公告与研报自动聚合</h1>
+    <p class="lede">对标简历「上市公司公告与研报自动聚合 RPA 爬虫系统」。本复现用东方财富公告接口免登录拉列表，PDF 自动下载（含 <b>JS 挑战逆向破解</b>），pypdf 解析正文，自动提取公告类型与金额，结构化入库。</p>
+    <div class="meta">
+      <span>JS 挑战逆向破解</span>
+      <span>PDF 自动下载解析</span>
+      <span>金额自动提取</span>
+      <span>增量入库</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="d-grid">
+      <div class="d-card glass reveal">
+        <h3>项目背景</h3>
+        <p>投研团队要稳定拿到上市公司的公告和研报。公告列表有公开接口，但每份公告是 PDF，且 PDF 链接带 JS 挑战反爬——直接 requests 拿到的不是 PDF，而是一段混淆脚本。</p>
+      </div>
+      <div class="d-card glass reveal">
+        <h3>核心难点</h3>
+        <p>PDF 链接首次访问返回 <b>988 字节混淆 JS</b>（字符串数组 + 洗牌），挑战通过后写 cookie 再刷新才给真 PDF。需要理解并破解这段挑战，或让脚本自己算出 cookie。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">api</div>
+      <h2>公告列表接口（免登录 JSON）</h2>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">np-anotice-stock.eastmoney.com · GET</span>
+        </div>
+        <pre class="codewin-body"><code># 东方财富公告列表, 纯 requests 免登录
+# ?sr=-1&page_size=50&ann_type=A&stock_list=600519  (贵州茅台, 共1074条)
+# 返回 list[]: title / art_code / notice_date / columns
+# 注意: art_code 已带 "AN" 前缀, PDF 链接拼法 = H2_{art_code}_1.pdf
+#        (别多拼一个 AN, 否则 200 但返回空页 —— 我踩过这个坑)</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">js challenge</div>
+      <h2>PDF 的 JS 挑战逆向（核心亮点）</h2>
+      <p class="code-note">requests 访问 PDF 链接返回混淆 JS。先是人工还原，再做通用解法。<b>[逆向要点]</b> 标实测结论。</p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">挑战脚本结构（988 字节）</span>
+        </div>
+        <pre class="codewin-body"><code>// 字符串数组 + 洗牌 + 查表 = 字符串数组混淆(sojson 基础款, 不是真加密)
+var _0x49a6 = ["wyeCN","4|2|0|3|1","wQzOV","split","iTyzs","pCQRM",
+               "cookie","location...","WTKkN","bOYDu","dtzqS"];
+(function(a,n){for(;--n;)a.push(a.shift())})(_0x49a6,0x147); // 洗牌 327 次
+var _0x649a=function(a,n){a-=0;var e=_0x49a6[a];return e};    // 查表解密
+// document.cookie = "__tst_status="+a(0)+"#;" → 拼常量出 cookie 后刷新</code></pre>
+      </div>
+      <div class="d-grid">
+        <div class="d-card glass">
+          <h3>人工还原（验证理解）</h3>
+          <p>洗牌 327 次 = 左移 327 mod 11 = 左移 8 位 → 查表解出常量顺序。手算：<code>a(0)=943225403+963292024+1653318838=3559836265</code>，<code>a(1)="EO_Bot_Ssid=3495690240"</code>。带这俩 cookie 重请求 → 拿到 119987 字节真 PDF（<code>%PDF-1.7</code> 验证）✅</p>
+        </div>
+        <div class="d-card glass">
+          <h3>通用解法（不怕换常量）</h3>
+          <p>挑战脚本常量可能每次变。补个假 <code>document</code> 环境，让 Node 直接 <code>eval</code> 挑战脚本自己算 cookie，不依赖人工逆向。见下。</p>
+        </div>
+      </div>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/solve_challenge.js · Node 补环境通用解法</span>
+        </div>
+        <pre class="codewin-body"><code>const script = require('fs').readFileSync(0, 'utf-8'); // stdin 读挑战 JS
+let cookies = [];
+const document = {
+    set cookie(v) { cookies.push(v); },   // 捕获脚本写的 cookie
+    get cookie() { return cookies.join('; '); },
+};
+const location = { href: '', replace() {} };
+eval(script);   // cookie 在同步阶段已写入
+console.log(JSON.stringify(cookies));
+// 输出: ["__tst_status=3559836265#;","EO_Bot_Ssid=3495690240;"]</code></pre>
+      </div>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>[PDF] 已下载（直连 / Node 破解挑战）→ AN202608141827994407.pdf</div>
+        <div><span class="o">[+] </span>茅台财务报告 → 提取金额 25.0亿</div>
+        <div><span class="o">[+] </span>茅台半年报 → 类型[质押] 金额 356.42万</div>
+        <div><span class="o">[+] </span>宁德债券公告 → 金额 400.0亿 <span class="ok">[OK]</span></div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">ai session</div>
+      <h2>我是怎么和 Claude 配合把它跑通的</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>PDF 下载返回 988 字节脚本(不是 PDF) → 我把脚本全文贴给 Claude</div>
+        <div><span class="o">[+] </span>它认出是字符串数组混淆, 拆解洗牌/查表逻辑 → 手算 cookie 验证成功 <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>但手算是死的, 常量可能变 → 问 Claude 怎么通用化</div>
+        <div><span class="o">[+] </span>它给"补假 document 让 Node eval 自己算"方案 → solve_challenge.js <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>全流程 6 条全报"下载失败"但单独测是好的 → Claude 帮我查代码</div>
+        <div><span class="o">[+] </span>定位: art_code 已带 AN 前缀, PDF 链接又拼了个 AN → 双 AN 错误 URL <span class="ok">[FIXED]</span></div>
+      </div>
+      <div class="d-card glass" style="margin-top:16px">
+        <p><b>体会</b>：逆向最关键的不是"会读混淆"，是<b>认出它属于哪一类</b>（字符串数组 / 控制流 / 加密）。认出类，解法就有了：这类最简单，直接补环境让脚本自算。Claude 在这里帮我做了"归类"，我负责验证——这是它最有价值的用法。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">run</div>
+      <h2>运行命令</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>python main.py once     # 采集一轮(列表→PDF→解析→入库)</div>
+        <div><span class="p">$ </span>python main.py daemon   # 每3小时一轮</div>
+        <div><span class="p">$ </span>改 config.STOCKS: 加股票代码 如 300750 宁德时代</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找自动化 / RPA / AI 提效方向的机会</div>
+          <div style="margin-top:22px" class="reveal"><a class="cta" href="mailto:18975560804@163.com">联系我</a></div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> RPA 流程自动化 · AI 驱动开发 · 数据采集</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫 / RPA 工程师作品集</span>
+        <span><a href="../index.html" style="color:var(--dim)">← 返回首页</a></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+</body>
+</html>

@@ -136,7 +136,9 @@
       </div>
     </a>
 
-    <!-- 四宫格 -->
+    <div class="group-tag reveal"><span>方向 · 爬虫 / 数据采集</span><b>01</b></div>
+
+    <!-- 爬虫方向网格 -->
     <div class="proj-grid">
       <a class="proj-card glass reveal" href="projects/ecommerce.html">
         <div class="pname">时尚电商多平台商品监测</div>
@@ -162,7 +164,7 @@
         <div class="pterm"><div><span class="p">$ </span>python spiders/anjuke/run.py</div></div>
         <div class="go">查看详情</div>
       </a>
-      <a class="proj-card glass tinted reveal" href="projects/themes.html">
+      <a class="proj-card glass reveal" href="projects/themes.html">
         <div class="pname">题材库 · 题材掘金逆向</div>
         <p class="pdesc">微信小程序加密包解包 + 接口逆向，WASM AES 响应解密，735 个题材全量拉通。</p>
         <div class="meta"><span>735 个题材</span><span>244 个源码文件</span><span>WASM 解密</span></div>
@@ -183,6 +185,68 @@
           <div><span class="o">[+] </span>三端角色: 管理员 / 管家 / 租客</div>
           <div><span class="o">[+] </span>房源状态机: 待租 → 已租 → 退租 可追溯</div>
         </div>
+      </a>
+    </div>
+
+    <div class="group-tag reveal"><span>方向 · RPA 流程自动化 / AI 提效</span><b>02</b></div>
+
+    <!-- RPA 方向网格 -->
+    <div class="proj-grid">
+      <a class="proj-card glass tinted reveal" href="projects/rpa-jd.html">
+        <div class="pname">电商商品价格与评论监控</div>
+        <p class="pdesc">京东竞品价格监控：会话登录态复用免登采集，价格超阈值自动告警，matplotlib 波动报表。评论反爬挑战过程全记录。</p>
+        <div class="meta"><span>登录态复用</span><span>阈值告警</span><span>价格波动报表</span></div>
+        <div class="tags"><span>DrissionPage</span><span>cookie 会话管理</span><span>告警</span></div>
+        <div class="pterm"><div><span class="p">$ </span>python main.py once / daemon</div></div>
+        <div class="go">查看详情</div>
+      </a>
+      <a class="proj-card glass reveal" href="projects/rpa-jobs.html">
+        <div class="pname">招聘平台岗位信息采集</div>
+        <p class="pdesc">51job 免登录采集：监听 search-pc 接口拿 JSON 绕开 sign 签名，注入脚本破解无限 debugger，岗位入库导出 Excel。</p>
+        <div class="meta"><span>39 条真实岗位</span><span>接口监听</span><span>反 debugger</span></div>
+        <div class="tags"><span>接口监听</span><span>反 debugger</span><span>Excel</span></div>
+        <div class="pterm"><div><span class="p">$ </span>python main.py run</div></div>
+        <div class="go">查看详情</div>
+      </a>
+      <a class="proj-card glass reveal" href="projects/rpa-sentiment.html">
+        <div class="pname">企业公开舆情监控</div>
+        <p class="pdesc">指定企业全网舆情：新浪新闻搜索采集 → 标题指纹去重 → 词典情感标注 → HTML 看板推送。实测小米 15 条。</p>
+        <div class="meta"><span>指纹去重</span><span>情感标注</span><span>HTML 看板</span></div>
+        <div class="tags"><span>情感词典</span><span>看板</span><span>定时</span></div>
+        <div class="pterm"><div><span class="p">$ </span>python main.py once / daemon</div></div>
+        <div class="go">查看详情</div>
+      </a>
+      <a class="proj-card glass tinted reveal" href="projects/rpa-announce.html">
+        <div class="pname">上市公司公告研报聚合</div>
+        <p class="pdesc">东方财富公告接口 + PDF 自动下载。PDF 链接有 JS 挑战反爬 → 识别字符串数组混淆 → Node 补环境直接算出 cookie，pypdf 解析提取金额。</p>
+        <div class="meta"><span>JS 挑战逆向破解</span><span>PDF 解析提额</span><span>增量入库</span></div>
+        <div class="tags"><span>JS 逆向</span><span>Node 补环境</span><span>pypdf</span></div>
+        <div class="pterm"><div><span class="p">$ </span>python main.py once</div></div>
+        <div class="go">查看详情</div>
+      </a>
+      <a class="proj-card glass reveal" href="projects/rpa-policy.html">
+        <div class="pname">行业政策文件定向归档</div>
+        <p class="pdesc">gov.cn 政策列表采集 → 领域关键词分类 + 发布部门提取 → archive/领域/部门/标题.md 落盘 + 摘要索引。实测 20 条归档。</p>
+        <div class="meta"><span>20 条归档</span><span>领域分类</span><span>摘要索引</span></div>
+        <div class="tags"><span>gov.cn</span><span>分类归档</span><span>xpath</span></div>
+        <div class="pterm"><div><span class="p">$ </span>python main.py once</div></div>
+        <div class="go">查看详情</div>
+      </a>
+      <a class="proj-card glass reveal" href="projects/rpa-merchant.html">
+        <div class="pname">本地生活商家线索批量采集</div>
+        <p class="pdesc">高德网页版全被反爬（x5sec 滑块 / 不加载列表）→ 转官方 Web 服务 API 纯 requests。上海口腔诊所 176 条有效线索，2.6 万条/小时。</p>
+        <div class="meta"><span>176 条有效</span><span>2.6 万条/小时</span><span>有效性校验</span></div>
+        <div class="tags"><span>高德 API</span><span>纯 requests</span><span>校验</span></div>
+        <div class="pterm"><div><span class="p">$ </span>python main.py run</div></div>
+        <div class="go">查看详情</div>
+      </a>
+      <a class="proj-card glass reveal" href="projects/rpa-competitor.html">
+        <div class="pname">竞品官网动态监控</div>
+        <p class="pdesc">华为官网新闻定时采集 → 与历史快照差异比对（link 唯一）→ 增量检出 → Markdown 变化简报 + 邮件推送。首轮 12 条建基线，次轮 0 新增正确判重。</p>
+        <div class="meta"><span>差异比对</span><span>增量检出</span><span>简报推送</span></div>
+        <div class="tags"><span>快照比对</span><span>定时</span><span>邮件</span></div>
+        <div class="pterm"><div><span class="p">$ </span>python main.py once / daemon</div></div>
+        <div class="go">查看详情</div>
       </a>
     </div>
   </div>
@@ -258,8 +322,8 @@
         </div>
       </div>
       <div class="foot-bottom">
-        <span>程烁 · 爬虫工程师作品集</span>
-        <span>7 页 · 统一配色 · 玻璃拟态</span>
+        <span>程烁 · 爬虫 / RPA 工程师作品集</span>
+        <span>爬虫 × RPA 两方向 · 统一配色 · 玻璃拟态</span>
       </div>
     </div>
   </div>

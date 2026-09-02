@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>企业公开舆情监控 · RPA · 程烁作品集</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-back" href="../index.html">← 返回首页</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<header class="d-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../index.html">首页</a> / RPA / 舆情监控</div>
+    <h1>企业公开舆情信息定向爬取</h1>
+    <p class="lede">对标简历「企业公开舆情信息定向爬取 RPA 机器人」。本复现用新浪新闻搜索（免登录）定向采集指定企业舆情：标题指纹去重 → 词典情感标注 → HTML 看板推送。实测监控小米：15 条新闻，涨价类正确标负面。</p>
+    <div class="meta">
+      <span>多站点适配</span>
+      <span>标题指纹去重</span>
+      <span>词典情感标注</span>
+      <span>HTML 看板</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="d-grid">
+      <div class="d-card glass reveal">
+        <h3>项目背景</h3>
+        <p>品牌/公关每天要盯自家企业、竞品在全网的新闻和舆论风向。舆情源从百度新闻、微博到垂直社区，且要自动去重、标情感、汇总成看板，替代人工每天手动搜。</p>
+      </div>
+      <div class="d-card glass reveal">
+        <h3>核心难点</h3>
+        <p>① 新闻源大多有反爬（百度有验证、微博要登录）；② 新浪新版搜索页的<b>组合 CSS 选择器在 DrissionPage 里失效</b>（<code>.result-title a</code> 取不到）；③ 情感标注要能识别行业语境（涨价对消费者是负面）。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">source</div>
+      <h2>免登录舆情源：新浪新闻搜索</h2>
+      <p class="code-note">实测可用，免登录。踩坑：<code>.result-title a</code> 后代组合选择器在 DrissionPage 4.1 取不到（<b>[要点]</b> 多个站点都遇到，规律是"后代组合 CSS 失效"），改用「容器取文本 + 卡片内 tag:a 取链接」。</p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/collector.py · SITE_SELECTORS</span>
+        </div>
+        <pre class="codewin-body"><code># 新浪搜索: search.sina.com.cn/search?q={keyword}&tp=news  (免登录)
+SITE_SELECTORS = {
+    "新浪新闻": {
+        'card': '.result-item',     # 结果卡片
+        'title': '.result-title',   # 组合 .result-title a 失效 → 用容器取文本
+        'link':  'tag:a',           # 卡片内第一个 a 的 href
+        'summary': '.result-intro',
+    },
+}</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">sentiment</div>
+      <h2>词典情感标注（零依赖）</h2>
+      <p class="code-note">情感标注第一版全"中性"——因为行业词没进词典。"涨价/调价/涨幅"在 51job 语境是中性词但对企业舆情是负面，扩充词典后实测纠正。<b>[要点]</b></p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/sentiment.py</span>
+        </div>
+        <pre class="codewin-body"><code># 词典法: 统计正/负面词出现次数, 零第三方依赖, 可换 SnowNLP/大模型
+POSITIVE_WORDS = {'利好','增长','突破','领先','获奖','签约','合作',
+                  '降价','下调','回购','增持','中标','热销','销量新高'}
+NEGATIVE_WORDS = {'投诉','亏损','下滑','违规','处罚','召回','裁员','诉讼',
+                  '曝光','缺陷','事故','造假','质疑','暴跌',
+                  '涨价','上调','涨幅','维权','赔偿','下架','故障','退货'}
+
+def tag_sentiment(text: str) -> str:
+    pos = sum(1 for w in POSITIVE_WORDS if w in text)
+    neg = sum(1 for w in NEGATIVE_WORDS if w in text)
+    return '正面' if pos > neg else ('负面' if neg > pos else '中性')</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">dedup / board</div>
+      <h2>去重 + 看板</h2>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/dedup.py + core/saver.py</span>
+        </div>
+        <pre class="codewin-body"><code># 标题指纹去重: 去标点/空白/大小写后 md5, 内容相近视为重复
+def title_fingerprint(title):
+    norm = re.sub(r'[\s\W_]+', '', title.lower())
+    return hashlib.md5(norm.encode()).hexdigest()
+
+# HTML 看板: 关键词×情感统计 + 最新 200 条列表, 双击即看 (dashboard.html)</code></pre>
+      </div>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>[采集] 新浪新闻: 15 条 → [去重] 15 条全新增</div>
+        <div><span class="p">$ </span>[入库] 15 条 | 情感分布: 负面 13 / 中性 2</div>
+        <div><span class="o">[+] </span>[负面] 小米、华为、荣耀集体调价！最高涨1000元！</div>
+        <div><span class="o">[+] </span>[中性] 新势力车企8月战报: 零跑破10万台... <span class="ok">[OK]</span></div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">ai session</div>
+      <h2>我是怎么和 Claude 配合把它跑通的</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>新浪结果页能打开但 0 条 → 把现象贴给 Claude</div>
+        <div><span class="o">[+] </span>它让 dump 页面 HTML → 发现是 Ant Design 新版(.result-item)</div>
+        <div><span class="o">[+] </span>.result-title a 组合选择器取不到 → 它指出后代 CSS 失效, 改容器+tag:a <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>15 条全是"中性" → 我怀疑词典不够 → Claude 建议行业词入词典</div>
+        <div><span class="o">[+] </span>"涨价/调价"入负面词后, 13 条涨价新闻正确标负面 <span class="ok">[OK]</span></div>
+      </div>
+      <div class="d-card glass" style="margin-top:16px">
+        <p><b>体会</b>：Claude 帮我建立了两个可复用判断：<b>① 页面抓不到先 dump HTML 看真实结构，别猜选择器</b>；<b>② 情感词典是领域工程</b>——规则会随监控对象变，先跑通再按行业调词典，不追求一步到位。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">run</div>
+      <h2>运行命令</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>python main.py once     # 采集一轮 → 去重 → 标注 → 看板</div>
+        <div><span class="p">$ </span>python main.py daemon   # 每小时一轮(定时任务)</div>
+        <div><span class="p">$ </span>改 config.KEYWORDS: 监控的企业名</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找自动化 / RPA / AI 提效方向的机会</div>
+          <div style="margin-top:22px" class="reveal"><a class="cta" href="mailto:18975560804@163.com">联系我</a></div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> RPA 流程自动化 · AI 驱动开发 · 数据采集</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫 / RPA 工程师作品集</span>
+        <span><a href="../index.html" style="color:var(--dim)">← 返回首页</a></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+</body>
+</html>

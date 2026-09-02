@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>竞品官网动态监控 · RPA · 程烁作品集</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-back" href="../index.html">← 返回首页</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<header class="d-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../index.html">首页</a> / RPA / 竞品监控</div>
+    <h1>竞品官网动态内容自动化监控</h1>
+    <p class="lede">对标简历「竞品官网动态内容自动化监控 RPA 机器人」。本复现用华为官网新闻中心（免登录）：定时采集板块内容，与历史快照<b>差异比对</b>，只检出新增 → 生成 Markdown 变化简报 → 邮件推送。首轮 12 条建基线，次轮 0 新增正确判重。</p>
+    <div class="meta">
+      <span>页面差异自动比对</span>
+      <span>增量内容定向爬取</span>
+      <span>简报生成 + 邮件推送</span>
+      <span>定时</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="d-grid">
+      <div class="d-card glass reveal">
+        <h3>项目背景</h3>
+        <p>业务团队要第一时间知道竞品官网出了什么新东西（新闻、产品更新、招聘）。人工每天刷几个官网不现实——要自动盯、只报增量、还要汇总成简报推给团队。</p>
+      </div>
+      <div class="d-card glass reveal">
+        <h3>核心难点</h3>
+        <p>① 官网新闻是 <b>JS 异步渲染</b>，源码里抓不到；② "哪些是新增"要跟历史比，不能每次都全量报（会刷屏）；③ 差要比对要<b>幂等</b>——同一篇新闻重复抓不能产生脏数据。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">watch</div>
+      <h2>华为官网新闻采集（异步渲染用 xpath）</h2>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">config.COMPETITORS + core/watcher.py</span>
+        </div>
+        <pre class="codewin-body"><code>COMPETITORS = [{
+    "name": "华为",
+    "sections": [{
+        "name": "新闻中心",
+        "url": "https://www.huawei.com/cn/news",
+        # 新闻 JS 异步渲染 → xpath 抓新闻链接 (带年份路径的都是详情页)
+        "list_sel": "xpath://a[contains(@href, '/cn/news/2026/')]",
+    }],
+}]
+# 相似元素批量抓: 每个 a 的文本=标题, href=链接</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">diff</div>
+      <h2>页面差异自动比对（增量检出）</h2>
+      <p class="code-note">快照表用 <code>link UNIQUE</code> 做唯一键：插入成功 = 历史里没有 = 新增；<code>IntegrityError</code> = 旧条目直接跳过。首次运行自动建立基线，之后只报增量。<b>[要点]</b></p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/diff.py</span>
+        </div>
+        <pre class="codewin-body"><code>def find_new(competitor, items):
+    new_items = []
+    for it in items:
+        try:
+            conn.execute(
+                "INSERT INTO snapshot (competitor,section,title,link,first_seen)"
+                " VALUES (?,?,?,?,?)",
+                (competitor, it['section'], it['title'], it['link'], now))
+            new_items.append(it)     # 插入成功 = 快照里没有 = 新增
+        except sqlite3.IntegrityError:
+            pass                     # link 已存在 = 旧条目, 跳过
+    return new_items                 # 首次运行: 全部入库建基线, 无简报</code></pre>
+      </div>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>首次运行: [比对] 华为: 新增 12 / 12 → 生成简报(建基线)</div>
+        <div><span class="p">$ </span>二次运行: [比对] 华为: 新增 0 / 12 → 无简报 <span class="ok">[OK]</span></div>
+        <div><span class="o">[+] </span>简报含标题/日期/链接, Markdown: output/变化简报_时间戳.md</div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">ai session</div>
+      <h2>我是怎么和 Claude 配合把它跑通的</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>华为官网打开正常但新闻列表抓不到 → 给 Claude 看页面现象</div>
+        <div><span class="o">[+] </span>它判断是 JS 异步渲染 → 让先 dump 页面链接特征 → 定位到 /cn/news/2026/ 路径规律</div>
+        <div><span class="o">[+] </span>用 xpath 抓带年份的新闻链接, 一次抓全 <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>怎么保证"只报新增"不重复 → Claude 给快照表 link UNIQUE + 幂等插入方案</div>
+        <div><span class="o">[+] </span>差异比对 + 首轮建基线, 二次验证 0 新增 <span class="ok">[OK]</span></div>
+      </div>
+      <div class="d-card glass" style="margin-top:16px">
+        <p><b>体会</b>：竞品监控这类"常驻跑"的流程，最怕脏数据和刷屏。Claude 教的"<b>唯一键 + 幂等插入</b>"让增量判断变得零成本——同一篇新闻无论抓到几轮都只算一次。这是企业流程自动化的基本功：<b>流程要能长期自己跑，不依赖人盯着纠错</b>。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">run</div>
+      <h2>运行命令</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>python main.py once     # 立即检查一轮</div>
+        <div><span class="p">$ </span>python main.py daemon   # 每小时一轮(动态信息小时级捕获)</div>
+        <div><span class="p">$ </span>配好 config.SMTP_* 后自动邮件推送简报</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找自动化 / RPA / AI 提效方向的机会</div>
+          <div style="margin-top:22px" class="reveal"><a class="cta" href="mailto:18975560804@163.com">联系我</a></div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> RPA 流程自动化 · AI 驱动开发 · 数据采集</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫 / RPA 工程师作品集</span>
+        <span><a href="../index.html" style="color:var(--dim)">← 返回首页</a></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+</body>
+</html>

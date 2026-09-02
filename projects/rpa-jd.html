@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电商商品价格监控 · RPA · 程烁作品集</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-back" href="../index.html">← 返回首页</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<header class="d-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../index.html">首页</a> / RPA / 电商价格监控</div>
+    <h1>电商商品价格与评论自动化监控 RPA</h1>
+    <p class="lede">对标简历「电商平台商品价格与评论自动化监控」项目（原为 UiPath+Python 混合）。本复现用 Python + DrissionPage：京东竞品价格定时采集，价格变动超阈值自动告警，波动报表出图。登录态会话复用全链路打通。</p>
+    <div class="meta">
+      <span>会话登录态复用</span>
+      <span>阈值告警实测触发</span>
+      <span>价格波动报表</span>
+      <span>DrissionPage</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="d-grid">
+      <div class="d-card glass reveal">
+        <h3>项目背景</h3>
+        <p>运营团队要实时掌握竞品价格动态。人工每天刷网页太低效。目标：定时采集竞品价格，自动比对历史，波动超阈值就通知人，并生成价格走势报表。</p>
+      </div>
+      <div class="d-card glass reveal">
+        <h3>核心难点</h3>
+        <p>京东未登录访问商品页会 <b>302 跳登录页</b>；新版商品页价格不是写死在源码，而是 JS 渲染（旧选择器 <code>#jd-price</code> 只剩在 CSS 里）；登录 cookie 名单随版本变化（<code>pt_key/pt_pin</code> 是老体系，新版是 <code>pin/unick/token</code>）。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">login reuse</div>
+      <h2>会话登录态复用（对应简历第 3 条）</h2>
+      <p class="code-note">三级登录态策略：<b>[逆向要点]</b> 浏览器持久会话最稳 → cookies 文件兜底 → 都失效才引导扫码。首次扫码一次，之后长期复用，跳过验证码。</p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/fetcher.py · LoginManager</span>
+        </div>
+        <pre class="codewin-body"><code># 1) 优先复用浏览器持久会话（DrissionPage 固定用户目录，登录一次长期有效）
+if self._check_ok():
+    self._save_cookies()          # 同步最新 cookies 到本地文件
+    return session
+
+# 2) 复用本地 cookies 文件（注入浏览器后再验证）
+if os.path.exists(COOKIE_FILE) and any(
+        c['name'] in LOGIN_COOKIE_NAMES for c in cookies):
+    self.inject_to_browser()
+    if self._check_ok():
+        return session
+
+# 3) 都失效 → 引导扫码一次，之后长期复用
+self.page.get('https://www.jd.com')
+for i in range(120):              # 轮询等登录标志 cookie 出现
+    if self._has_login_cookie(): break
+    time.sleep(3)
+self._save_cookies()</code></pre>
+      </div>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/fetcher.py · 登录标志 cookie 名单</span>
+        </div>
+        <pre class="codewin-body"><code># [逆向要点] 京东登录 cookie 分新旧体系, 全要覆盖:
+# 新版: pin / unick / sdtoken / token   扫码: pt_key/pt_pin   密码: pwdt_id
+LOGIN_COOKIE_NAMES = ('pt_key','pt_pin','pwdt_id','pin','unick','sdtoken','token')
+
+def _check_ok(self):            # 访问商品页, 不再 302 到 passport 才算登录有效
+    self.page.get(config.COMPETITORS[0]['url'])
+    self.page.wait(2)
+    return 'passport.jd.com' not in self.page.url</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">price selector</div>
+      <h2>新版商品页价格选择器（被坑实录）</h2>
+      <p class="code-note">先照老教程用 <code>#jd-price</code>，结果抓空——它在 DOM 里只剩 CSS 类名。页面 dump 后定位到新版结构：价格在 <code>.product-price--value</code>，JS 渲染需轮询等出现。</p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/fetcher.py · 价格采集</span>
+        </div>
+        <pre class="codewin-body"><code># 价格是 JS 渲染的, 轮询等它出现 (对应 RPA"等待元素出现")
+for _ in range(config.LOAD_TIMEOUT * 2):
+    price_ele = page.ele('.product-price--value', timeout=1)  # 新版页面价格
+    if price_ele and price_ele.text.strip(): break
+    time.sleep(0.5)
+price = float(price_ele.text.strip().replace(',', ''))
+
+# 库存: 无货时页面出现"暂时售完", 有货显示"加入购物车"
+stock = '无货' if '暂时售完' in body_text[:2000] else '有货'</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">ai session</div>
+      <h2>我是怎么和 Claude 配合把它跑通的</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>我先照老教程写 #jd-price 选择器 → 抓空</div>
+        <div><span class="p">$ </span>问 Claude: 京东价格为什么抓不到 → 它让我 dump 页面 DOM 而非只看教程</div>
+        <div><span class="o">[+] </span>发现 jd-price 只在 CSS 里 → 定位到 .product-price--value <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>登录态"检测不到登录成功"卡了 2 轮 → Claude 让我打印浏览器实际 cookie 名</div>
+        <div><span class="o">[+] </span>发现新版标志是 pin/unick/token, 不是老的 pt_key → 更新检测名单 <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>Claude 提示 DrissionPage 用户目录持久 → 登录一次长期复用, 不必每次重登</div>
+        <div><span class="o">[+] </span>三级登录态策略落地, 之后全自动 <span class="ok">[OK]</span></div>
+      </div>
+      <div class="d-card glass" style="margin-top:16px">
+        <p><b>体会</b>：Claude 不直接给"答案"，而是带我 <b>看真实证据</b>（dump DOM、打印 cookie）。我负责判断和验证，它负责把大段排错拆成小步。这就是"用 AI 提效"——不是把活丢给它，是让它把我的问题变成可执行的排查清单。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">run / result</div>
+      <h2>运行与产出</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>python main.py once      # 单次采集一轮</div>
+        <div><span class="p">$ </span>python main.py daemon    # 定时监控</div>
+        <div><span class="o">[+] </span>[告警] 竞品价格 ¥15.84 → ¥18.90 (+19.3%, 阈值5%) <span class="ok">[TRIGGERED]</span></div>
+        <div><span class="o">[+] </span>[告警] 竞品价格 ¥16.74 → ¥19.80 (+18.3%) <span class="ok">[TRIGGERED]</span></div>
+        <div><span class="o">[+] </span>价格波动报表 price_10231125061674.png 已生成</div>
+      </div>
+      <div class="d-grid" style="margin-top:16px">
+        <div class="d-card glass">
+          <h3>已跑通</h3>
+          <p>登录态复用 · 价格/库存采集 · 历史入库比对 · 波动报表 · 阈值告警（实测触发 +19.3%）</p>
+        </div>
+        <div class="d-card glass">
+          <h3>如实记录</h3>
+          <p>评论模块卡在 club.jd.com 接口（带登录态仍返回"系统繁忙"，且三方店无标准评论区），标注为后续攻坚项——这属于另一条逆向链，不在本次范围。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找自动化 / RPA / AI 提效方向的机会</div>
+          <div style="margin-top:22px" class="reveal"><a class="cta" href="mailto:18975560804@163.com">联系我</a></div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> RPA 流程自动化 · AI 驱动开发 · 数据采集</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫 / RPA 工程师作品集</span>
+        <span><a href="../index.html" style="color:var(--dim)">← 返回首页</a></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+</body>
+</html>
