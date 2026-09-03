@@ -114,25 +114,26 @@
       <p>简历项目系统复现，全部真实数据跑通。点击项目进入详情页，可看真实核心算法代码。</p>
     </div>
 
-    <!-- 重点项目大卡 -->
-    <a class="proj-featured glass reveal" href="projects/quant.html">
+    <!-- 重点项目大卡 (置顶: 运营自动化 · 批量改价工具) -->
+    <a class="proj-featured glass reveal" href="projects/feiyan-pricing.html">
       <div class="proj">
-        <div class="pname">股市量化分析智能平台</div>
-        <div class="pdesc">整合中证指数、Wind、彭博、东方财富、同花顺公开数据，构建股价、财报、K线、资金流向、股东信息多维量化库。</div>
+        <div class="pname">飞鸭童装运营 · 批量改价自动化工具</div>
+        <div class="pdesc">面向童装品牌渠道服务（拼多多 + 天猫超市）的运营自动化：运营填「款号+调价规则」→ 秒级按双平台价格口径算价 + 自动拦截低于成本/破历史最低的"亏本改价" → 输出拼多多/猫超导入模板 + 异常标红汇总。配影刀后台上传手册 + 落地蓝图。</div>
         <div class="meta">
-          <span>东方财富 9 大榜单</span>
-          <span>push2 接口逆向</span>
-          <span>K线采集</span>
-          <span>MySQL 双表 upsert</span>
+          <span>双平台价格口径</span>
+          <span>异常保护 · 防改亏</span>
+          <span>安全防线拦截负价</span>
+          <span>16 个单测全绿</span>
         </div>
-        <div class="tags"><span>Scrapy</span><span>JS 逆向</span><span>定时增量</span></div>
+        <div class="tags"><span>规则引擎</span><span>Python</span><span>影刀对接</span><span>AI 驱动</span></div>
         <div class="go">查看详情</div>
       </div>
       <div class="pterm">
-        <div><span class="p">$ </span>python spiders/eastmoney/run.py --pz 20</div>
-        <div><span class="o">[+] </span>东方财富 9 大榜单，fs 参数体系，无签名</div>
-        <div><span class="o">[+] </span>频率型 IP 限流：备用域名 + 低频 + 退避</div>
-        <div><span class="o">[+] </span>stock_quote + stock_kline 双表入库 <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>python main.py     # 10 款示例秒算</div>
+        <div><span class="o">[+] </span>拼多多/猫超模板 + 异常标红汇总 <span class="ok">[OK]</span></div>
+        <div><span class="o">[+] </span>2 款低于成本被拦 <span class="ok">[RED]</span> 防止改亏</div>
+        <div><span class="p">$ </span>python -m unittest tests -v</div>
+        <div><span class="o">[+] </span>Ran 16 tests <span class="ok">[OK]</span></div>
       </div>
     </a>
 
@@ -140,6 +141,14 @@
 
     <!-- 爬虫方向网格 -->
     <div class="proj-grid">
+      <a class="proj-card glass tinted reveal" href="projects/quant.html">
+        <div class="pname">股市量化分析智能平台</div>
+        <p class="pdesc">中证指数、Wind、东方财富、同花顺公开数据 → 股价/财报/K线/资金流向/股东信息多维量化库。</p>
+        <div class="meta"><span>东方财富 9 大榜单</span><span>push2 接口逆向</span><span>MySQL 双表</span></div>
+        <div class="tags"><span>Scrapy</span><span>JS 逆向</span><span>定时增量</span></div>
+        <div class="pterm"><div><span class="p">$ </span>python spiders/eastmoney/run.py --pz 20</div></div>
+        <div class="go">查看详情</div>
+      </a>
       <a class="proj-card glass reveal" href="projects/ecommerce.html">
         <div class="pname">时尚电商多平台商品监测</div>
         <p class="pdesc">义乌购、苏宁、淘宝 3 平台。淘宝 sign 算法逆向闭环，自建代理池。</p>

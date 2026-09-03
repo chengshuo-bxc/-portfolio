@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>飞鸭童装运营 · 批量改价自动化工具 · 程烁作品集</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-back" href="../index.html">← 返回首页</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<header class="d-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../index.html">首页</a> / RPA / 批量改价工具</div>
+    <h1>飞鸭童装运营 · 批量改价自动化工具</h1>
+    <p class="lede">针对童装品牌渠道服务（拼多多 + 天猫超市）的运营高频痛点：运营把「款号 + 调价规则」填进价目表 → 工具秒级按双平台价格口径算价，自动拦截低于成本 / 破历史最低的"亏本改价"→ 输出拼多多 / 猫超导入模板 + 异常标红汇总。安全防线实测拦截负价，代码带 16 个自动化单测。</p>
+    <div class="meta">
+      <span>双平台价格口径</span>
+      <span>异常保护 · 防改亏</span>
+      <span>安全防线</span>
+      <span>16 个单测全绿</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="d-grid">
+      <div class="d-card glass reveal">
+        <h3>从真实业务需求出发</h3>
+        <p>渠道服务商的运营每天在做上架、主图详情优化、下架、批量改价。改价是其中规则最清晰、重复最高的一条——但它有个隐形风险：<b>几百款手改，容易把价改亏</b>（忘了成本线、忘了历史最低价）。</p>
+      </div>
+      <div class="d-card glass reveal">
+        <h3>拆解后的工具边界</h3>
+        <p>把"批量改价"拆成两步：<b>算价（规则 + 防亏校验）</b> 交给工具（可追溯、秒级、标红异常），<b>上后台上传确认</b> 交给影刀（配手册，需商家账号）。人工只保留最后的业务确认——人把时间还给"决定"，不还"操作"。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">architecture</div>
+      <h2>工具架构</h2>
+      <div class="d-card glass" style="margin-top:16px">
+        <ul>
+          <li><b>config.py</b> —— 平台价格规则（拼单价/单买价系数、猫超最低毛利）、模板列名全配置化，接真实平台模板只改配置不动代码</li>
+          <li><b>core/pricing.py</b> —— 调价规则解析 + 双平台算价 + 安全防线（零价/负价拦截）</li>
+          <li><b>core/exporter.py</b> —— 拼多多模板 / 猫超模板 / 异常标红汇总 Excel</li>
+          <li><b>main.py</b> —— CLI 编排：读价目表 → 算价 → 拦截/标红 → 导出</li>
+          <li><b>tests.py</b> —— 16 个自动化单测（规则/算价/防线/保护/模板）</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">rule engine</div>
+      <h2>调价规则引擎（运营可读的输入）</h2>
+      <p class="code-note">运营不懂正则，所以规则用自然语言格式：<code>绝对值:49.9</code>（直接设价）或 <code>百分比:+5% / -10%</code>。解析兼容半角/全角冒号，非法规则不崩、整行拦截。</p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/pricing.py · parse_rule</span>
+        </div>
+        <pre class="codewin-body"><code>def parse_rule(rule: str):
+    """'绝对值:49.9' → ('abs', 49.9)   '百分比:-5%' → ('pct', -0.05)"""
+    m = re.match(r'绝对值[:：]\s*([\d.]+)', rule)
+    if m:
+        return 'abs', float(m.group(1))
+    m = re.match(r'百分比[:：]\s*([+-]?[\d.]+)%', rule)
+    if m:
+        return 'pct', float(m.group(1)) / 100
+    return 'none', 0.0    # 非法规则 → none, 由调用方拦截该行</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">dual platform</div>
+      <h2>双平台算价 + 安全防线</h2>
+      <p class="code-note">拼多多维护「拼单价 + 单买价」，猫超是供应商供价体系——同一"业务调价"要在两套口径下分别落价。算完立刻过安全防线，<b>[逆向要点]</b> 零价/负价（降幅过大）直接整行拦截，绝不进上传模板。</p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/pricing.py · calc_for_row</span>
+        </div>
+        <pre class="codewin-body"><code># --- 拼多多 ---
+base_g = row['pdd_group'] or row['pdd_single'] or 0
+pdd_group = val if kind == 'abs' else base_g * (1 + val)
+pdd_group = round(pdd_group, 2)
+pdd_single = round(pdd_group * config.PDD_GROUP_SINGLE_RATIO, 2)  # 单买=拼单价×系数
+
+# [安全防线] 零价/负价(降幅过大) 或低于最低可售 → 整行拒绝, 不进模板
+if pdd_group <= 0 or pdd_group < config.PDD_MIN_PRICE:
+    return {'error': f"拼单价 {pdd_group} 低于最低可售({config.PDD_MIN_PRICE}元)..."}
+
+# --- 猫超(供价体系) ---
+if kind == 'abs':   # 绝对值视为目标零售价; 无原供价按 零售×0.9 估供价
+    tms_supply = row['tms_supply'] or round(val * 0.9, 2)
+else:
+    tms_supply = round((row['tms_supply'] or row['cost'] * 2 or base_g) * (1 + val), 2)</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">guard</div>
+      <h2>异常保护：防止把价改亏</h2>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/pricing.py · guard_comment</span>
+        </div>
+        <pre class="codewin-body"><code>floor = round(cost * (1 + config.MIN_MARGIN), 2)   # 保本线 = 成本×1.15
+if pdd_group < floor:  notes.append(f"拼单价低于保本线({floor})")
+if pdd_single < pdd_group:  notes.append("单买价低于拼单价(倒挂)")
+if HISTORY_LOW.get(sku) and pdd_group < HISTORY_LOW[sku]:
+    notes.append("低于历史最低价")                    # 活动价保护
+if tms_supply < cost * (1 + TMS_MIN_MARGIN):
+    notes.append("猫超供价毛利不足")                   # 供价不亏
+# 任一命中 → 汇总行整行标红(FFC7CE), 运营必须人工确认后才能上传</code></pre>
+      </div>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>FY26T09 拼 31.9→19.14 ⚠ 拼单价低于保本线(23.0)</div>
+        <div><span class="p">$ </span>FY26P10 拼 41.9→29.9 ⚠ 拼单价低于保本线(37.95) <span class="ok">[RED]</span></div>
+        <div><span class="o">[+] </span>异常行在汇总 Excel 整行标红, 模板自动跳过</div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">tests</div>
+      <h2>自动化测试（16 例全绿）</h2>
+      <p class="code-note">面试讲"我代码带单测"= 工程习惯。覆盖：规则解析（含全角冒号/非法/空）→ 双平台算价（±%）→ 安全防线（负价/低于最低可售拦截）→ 异常保护（低于成本标红）→ 模板错误行跳过。</p>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>python -m unittest tests -v</div>
+        <div><span class="o">[+] </span>Ran 16 tests in 0.010s <span class="ok">[OK]</span></div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">ai session</div>
+      <h2>我是怎么和 Claude 配合做出来的</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>HR 给需求(上架/主图优化/下架/批量改价) → 我问 Claude 怎么拆</div>
+        <div><span class="o">[+] </span>它建议别贪多, 先做"规则最清晰、收益最快、风险可控"的批量改价</div>
+        <div><span class="o">[+] </span>同时点破: 真实后台要商家账号, 拆成"算价(工具)+传后台(影刀)"两层 <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>写完第一版 → 我让它 review 代码 + 跑边界用例</div>
+        <div><span class="o">[+] </span>抓到真 bug: "百分比:-200% 算出负价 -19.9 没拦, 还导出模板"</div>
+        <div><span class="o">[+] </span>补安全防线: 零价/负价整行拦截 + 单测固化, 复测通过 <span class="ok">[OK]</span></div>
+      </div>
+      <div class="d-card glass" style="margin-top:16px">
+        <p><b>体会</b>：真正的"用 AI 提效"是——AI 帮我<b>拆业务 + review 代码抓漏洞</b>，我负责确认规则对业务成立。负价那个 bug 就是 review 出来的：表面"能跑"，实际上传模板会出大事。所以工具一定带<b>安全防线 + 单测</b>，演示才敢给人点。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">run</div>
+      <h2>运行与产出</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>python main.py                        # 跑示例价目表</div>
+        <div><span class="p">$ </span>python -m unittest tests -v          # 跑单测</div>
+        <div><span class="p">$ </span>产出 output/: 拼多多模板.csv / 猫超模板.csv / 调价汇总_含异常.xlsx</div>
+      </div>
+      <div class="d-grid" style="margin-top:16px">
+        <div class="d-card glass">
+          <h3>为什么这个工具对业务成立</h3>
+          <p>① 运营只填一张表，不碰代码；② 双平台口径自动分价；③ 防亏标红兜底；④ 模板列名配置化，接平台新版只改 config；⑤ 配影刀手册 + 落地蓝图，能一路串到"上架/下架/素材优化/系统化"。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>待接入生产的点（如实）</h3>
+          <p>真实后台上传需商家账号实测；模板字段按平台现行版本对齐；拼单价/供价系数需运营确认真实口径（当前为合理估算 + 配置可调）。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找自动化 / RPA / AI 提效方向的机会</div>
+          <div style="margin-top:22px" class="reveal"><a class="cta" href="mailto:18975560804@163.com">联系我</a></div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> RPA 流程自动化 · AI 驱动开发 · 数据采集</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫 / RPA 工程师作品集</span>
+        <span><a href="../index.html" style="color:var(--dim)">← 返回首页</a></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+</body>
+</html>
