@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>推广链接批量管理浏览器扩展 · 电商自动化 · 程烁作品集</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-back" href="../index.html">← 返回首页</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<header class="d-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../index.html">首页</a> / 电商自动化 / 推广链接批量管理</div>
+    <h1>推广链接批量管理浏览器扩展（MV3）</h1>
+    <p class="lede">电商推广后台里要清理大量推广链接时，平台自带的「批量操作」只在部分标签下露出、且对某些推广类型直接禁用。运营只能一条条点「更多 → 删除 → 确定」，几百条点到手软。<b>本扩展把这一步自动化</b>：读取列表 → 勾选/筛选 → 先试删 1 条验证 → 批量执行，全程可停、有日志、可导出。实测 <b>62 条连删 0 失败、约 4.9 秒/条</b>。</p>
+    <div class="meta">
+      <span>Chrome MV3 扩展</span>
+      <span>模拟真人点击 · 零风控</span>
+      <span>MV3 MAIN world 注入</span>
+      <span>带离线自检</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="d-grid">
+      <div class="d-card glass reveal">
+        <h3>项目背景</h3>
+        <p>推广投放里经常要批量删掉没效果的链接。平台自带的批量删除有限制（托管类推广一次只能删一条），而人工逐条点极慢，还容易误操作。</p>
+      </div>
+      <div class="d-card glass reveal">
+        <h3>核心难点</h3>
+        <p>后台接口校验动态签名（<code>anti-content</code> / <code>Anti-Content</code>），<b>一份签名只能连用 3~4 次</b>；用完继续硬冲会让风控升级，最后吐 <code>54001</code> 要人机验证。所以"偷签名大批量直发"这条路走不通。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">key insight</div>
+      <h2>关键决策：用"模拟真人点击"，而不是硬发请求</h2>
+      <p class="code-note"><b>[逆向要点]</b> 与其拿偷来的签名自己发请求（会被限速+风控加码），不如<b>替用户在页面上点</b>「更多 → 删除 → 确定删除」——请求由页面自己发，<b>每次都是新鲜签名</b>，平台看到的就是真人操作。实测后者零风控、稳定跑完。</p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">extension/content.js · 两种模式</span>
+        </div>
+        <pre class="codewin-body"><code>// 模拟点击（默认、推荐）：替用户点行内「更多 → 删除 → 确定删除」
+//  → 请求由页面自己发，每次新鲜签名，平台看到的是真人操作
+async function delViaUI(row) {
+  await row.more.click();                    // [data-testid="OperationsRow_More"]
+  await row.menuDelete.click();              // #{opId}Dropdown 里的「删除」
+  await confirmBtn.click();                  // [class*="DeleteConfirm_hack"] 里的「确定删除」
+}
+// 接口直发（快但易被拦，仅"一次能删一批"的场景）：由 inject.js 用偷来的签名发
+//  ⚠ 一份签名只能用 3~4 次 → 硬冲会让签名寿命越缩越短 → 最后 54001</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">architecture</div>
+      <h2>扩展架构：MAIN world 注入 + Shadow DOM 面板</h2>
+      <div class="d-grid" style="margin-top:16px">
+        <div class="d-card glass">
+          <h3>inject.js（MAIN world）</h3>
+          <p>页面加载前注入（<code>document_start</code>），hook 页面的 fetch / XHR：<b>偷签名</b>、<b>克隆页面的列表请求模板</b>（这样筛选条件永远和页面一致），并对外提供 RPC（list / del / harvest / status）。所有请求都从页面上下文发，cookie/referer/签名天然正确。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>content.js（面板）</h3>
+          <p>用 Shadow DOM 在右下角挂一个面板：读列表、勾选筛选、两种删除模式、进度条、实时日志、导出 Excel。与 inject.js 之间用 <code>postMessage</code> 做 RPC。</p>
+        </div>
+      </div>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">extension/manifest.json · MV3</span>
+        </div>
+        <pre class="codewin-body"><code>{ "content_scripts": [
+  { "matches": ["…/goods/promotion/*"], "js": ["inject.js"],
+    "run_at": "document_start", "world": "MAIN" },        // 抢在页面脚本前 hook
+  { "matches": ["…/goods/promotion/*"], "js": ["content.js"],
+    "run_at": "document_idle" } ] }</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">robustness</div>
+      <h2>把"平台机制"变成代码里的兜底</h2>
+      <ul class="code-note" style="margin-top:8px">
+        <li><b>托管号一次只能删一条</b>：平台后端对"全店托管"类推广拒批量请求 → 扩展自动改成一条条删（慢一点但删得完）。</li>
+        <li><b>54001 自动处理</b>：取接口返回的 <code>verifyAuthToken</code> → 带 <code>VerifyAuthToken</code> 头重试一次；再失败才让页面弹验证。</li>
+        <li><b>错误分类</b>：把"限速（稍后重试）"和"签名失效（请2小时后重试）"分开处理 —— 限速不能去补签名，补了也没用。</li>
+        <li><b>换账号免重装</b>：扩展不存账号，登录哪个号就删哪个号；换号后按 F5 刷新页面即可。</li>
+      </ul>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">test</div>
+      <h2>离线自检：不开浏览器也能验证逻辑</h2>
+      <p class="code-note">用一个"假的页面环境"跑 <code>inject.js</code>，覆盖 8 项：签名抓取、模板克隆、删除请求的 URL/body/header、54001 重试、以及"限速 vs 签名失效"的区分。</p>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>npm test</div>
+        <div><span class="o">[+] </span>[2] 签名份数=1 列表模板=true </div>
+        <div><span class="o">[+] </span>[5] 54001 → 重试过=true，第二次带 VerifyAuthToken=true <span class="ok">[OK]</span></div>
+        <div><span class="o">[+] </span>[7] "请稍后重试"→限速  [8] "请2小时后重试"→签名 <span class="ok">[OK]</span></div>
+        <div><span class="o">[+] </span>全部自检通过</div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">ai session</div>
+      <h2>我是怎么和 Claude 配合把它跑通的</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>先试"偷签名直接发" → 一天删 35 条后被限速、吐 54001</div>
+        <div><span class="o">[+] </span>一起复盘：签名寿命有限、风控是账号维度 → 决定改"模拟真人点击" <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>从页面源码里挖稳定的选择器（id=operationRow{N}、data-testid）</div>
+        <div><span class="o">[+] </span>62 条连删 0 失败、约 4.9 秒/条，账号无风控 <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>让 Claude 把逻辑抽成可离线自检 → 不开浏览器也能验证</div>
+      </div>
+      <div class="d-card glass" style="margin-top:16px">
+        <p><b>体会</b>：逆向里"能发请求"不等于"该发请求"。这个项目的转折点，是从"我比平台快"改成"我和真人一样慢"——<b>顺着平台的风控逻辑走，比硬碰硬更省事</b>。AI 帮我把平台机制一条条变成代码里的兜底。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找自动化 / RPA / AI 提效方向的机会</div>
+          <div style="margin-top:22px" class="reveal"><a class="cta" href="mailto:18975560804@163.com">联系我</a></div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> 电商自动化 · RPA · AI 驱动开发</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫 / RPA 工程师作品集</span>
+        <span><a href="../index.html" style="color:var(--dim)">← 返回首页</a></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+</body>
+</html>

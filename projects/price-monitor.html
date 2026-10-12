@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>多店铺价格监控与分级告警 · 电商自动化 · 程烁作品集</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-back" href="../index.html">← 返回首页</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<header class="d-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../index.html">首页</a> / 电商自动化 / 价格监控与告警</div>
+    <h1>多店铺价格监控与分级告警</h1>
+    <p class="lede">多店铺运营里，"价格被卖低"往往等到财务对账才发现，损失已经发生。<b>本系统定时盯住正在参加活动、还没结束的商品</b>，把「单件预估实收 / 活动报名价」和货盘底线逐款比对，破了线立即分级告警：轻的群里通知、重的自动加急 + 未读催办，并盯到有人处理为止。<b>平时很安静 —— 没破价不打扰，同一条只报一次。</b></p>
+    <div class="meta">
+      <span>签名池批量取数</span>
+      <span>分级告警 · 已读闭环</span>
+      <span>多店一店一浏览器</span>
+      <span>网页控制台</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="d-grid">
+      <div class="d-card glass reveal">
+        <h3>项目背景</h3>
+        <p>多家店铺同时在做活动，价格口径复杂（有的款要控价、有的款只看成本）。人工每小时翻后台比对不现实，破价又必须尽快发现。</p>
+      </div>
+      <div class="d-card glass reveal">
+        <h3>核心难点</h3>
+        <p>后台接口签名<b>一份只能用一次</b>（第 2 次即失败，且伪装成"请求频繁"）；货盘表在在线文档里、<b>控价列按日期分组会往右长</b>；告警还要能做到<b>分级 + 不重复打扰 + 已读闭环</b>。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">signature pool</div>
+      <h2>先解决"取数"：签名池打法</h2>
+      <p class="code-note"><b>[逆向要点]</b> 单个签名寿命极短，但页面一次加载会产生<b>上百份</b>签名。所以一次性全薅下来存池，<b>一个请求花一份、失败换一份重试</b>——全程纯接口翻页，完全不用点页面，几百个商品几页翻完。</p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/pdd_client.py · 签名池</span>
+        </div>
+        <pre class="codewin-body"><code>def post(page, sig, path, payload, refill_url):
+    for _ in range(5):
+        ac = sig.take()                       # 取没用过的一份签名
+        if ac is None:
+            sig.refill(page, refill_url); ac = sig.take()   # 池空 → 刷新页面补货
+        j = page.request.post(BASE + path, data=json.dumps(payload),
+                              headers={"anti-content": ac, ...}).json()
+        if j.get("success"): return j          # 成功
+        time.sleep(0.4)                        # 失败 → 换一份再来
+    raise RuntimeError("连续失败")</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">caliber</div>
+      <h2>口径：控价款 vs 不控价款，逐款比底线</h2>
+      <div class="d-grid" style="margin-top:16px">
+        <div class="d-card glass">
+          <h3>控价款</h3>
+          <p>底线 = 货盘里「拼多多,唯品会」控价列。<b>实收、报名价两个都判</b>，<b>严格小于</b>才算破（等于不算）。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>不控价款</h3>
+          <p>底线 = 成本价（防亏本卖）。货盘的控价列<b>按列名定位、逐款取最近一次非空</b> —— 绝不硬编码列号（列会往右长）。</p>
+        </div>
+      </div>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/rule.py · 判定 + 分档</span>
+        </div>
+        <pre class="codewin-body"><code>base = item["成本价"] if item["不控价"] else item["底价"]     # 底线按款性质取
+if 价 < base - tol:                                          # 严格小于才算破
+    margin = (base - 价) / base
+
+def level_of(margin, mid=20, high=40):                       # 按幅度分档
+    return "高级" if margin >= high else "中级" if margin >= mid else "群通知"</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">alerting</div>
+      <h2>分级告警 + 已读闭环（本项目的重点）</h2>
+      <p class="code-note">任何破价都发群通知 + 完整清单；严重的额外催办，并<b>盯到有人读了才停</b>。</p>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>幅度 &lt; 20%   → 只发群通知（含清单，不打扰）</div>
+        <div><span class="o">[+] </span>幅度 ≥ 20%   → 加急；未读 → 短信</div>
+        <div><span class="o">[+] </span>幅度 ≥ 40%   → 加急；未读 → 电话</div>
+        <div><span class="p">$ </span>每 10 分钟查一次「已读」，读了立刻闭环；价格回线也算结束</div>
+      </div>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/state.py · 防重复报 / 升级 / 恢复</span>
+        </div>
+        <pre class="codewin-body"><code># 同一「款号 + 类型」只报一次；幅度变大 → 升级再报；回线 → 发恢复并清状态
+if old is None:            r["动作"] = "首次破价"; notify.append(r)
+elif r["幅度"] > old["幅度"]: r["动作"] = "升级";     notify.append(r)
+# 一批破价只催一次（按 message_id 归并）
+# —— 曾按"条"催办，导致 40 条破价打了 40 个电话</code></pre>
+      </div>
+      <div class="d-card glass" style="margin-top:16px">
+        <p><b>踩过的坑</b>：飞书<b>群机器人 webhook 发不了文件</b>，要发清单附件得用企业自建应用；应用<b>权限给了 ≠ 群里搜得到</b>（还要开启"机器人"能力并发布）；<b>加急只能加在应用自己发的消息上</b>，且每条消息只能加急一次。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">multi-store</div>
+      <h2>多店 + 网页控制台</h2>
+      <p class="code-note">一家店一个账号、一个独立浏览器配置目录、一个独立端口，顺序跑。配一个本地网页控制台：勾选这次跑哪几家、改频率、看实时日志、随时停止。</p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/console.py · 两个单实例细节</span>
+        </div>
+        <pre class="codewin-body"><code>ThreadingHTTPServer.allow_reuse_address = False   # Windows 的 SO_REUSEADDR 会让两个进程
+                                                  # 绑同一端口 → 必须关，否则双击开出多个
+# "停止"要跨进程：界面和跑批不是一个进程 → 停止写一个 .停止请求 文件，跑批轮询它</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">ai session</div>
+      <h2>我是怎么和 Claude 配合把它跑通的</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>签名"一份只能用一次"卡住 → 一起设计出"签名池" </div>
+        <div><span class="o">[+] </span>页面一次薅上百份，一个请求花一份 <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>告警刷屏被人投诉 → 复盘发现"按条催办"</div>
+        <div><span class="o">[+] </span>改成"一批只催一次"+ 已读闭环 + 恢复通知 <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>货盘列往右长导致算错 → 改为按列名定位、取最近一次非空</div>
+      </div>
+      <div class="d-card glass" style="margin-top:16px">
+        <p><b>体会</b>：监控类系统"跑通"只算一半，另一半是<b>怎么让人不烦</b>——分级、去重、恢复、已读闭环。AI 帮我把风控机制和飞书的限制一条条查清、变成代码里的兜底；而"什么时候该打扰人、什么时候安静"这种判断，得我自己拿。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找自动化 / RPA / AI 提效方向的机会</div>
+          <div style="margin-top:22px" class="reveal"><a class="cta" href="mailto:18975560804@163.com">联系我</a></div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> 电商自动化 · RPA · AI 驱动开发</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫 / RPA 工程师作品集</span>
+        <span><a href="../index.html" style="color:var(--dim)">← 返回首页</a></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+</body>
+</html>

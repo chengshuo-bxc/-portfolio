@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电商活动报名商品 ID 自动提取 · 电商自动化 · 程烁作品集</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-back" href="../index.html">← 返回首页</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<header class="d-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../index.html">首页</a> / 电商自动化 / 活动商品 ID 提取</div>
+    <h1>电商活动报名商品 ID 自动提取</h1>
+    <p class="lede">大促期间运营要把「百亿补贴 / 潮流好价」报名记录里的商品 ID 全部抠出来，几百个链接、纯手工：整页复制到表格 → 删垃圾信息 → 一个个抠 ID，又慢又容易错。<b>本工具接管已登录浏览器，模拟人工点开活动卡片、自动翻页，从接口响应里精确取 ID</b>，几秒出一张表。</p>
+    <div class="meta">
+      <span>接管已登录浏览器</span>
+      <span>自动翻页 · 去重</span>
+      <span>不解析哈希类名</span>
+      <span>附接口侦察工具</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="d-grid">
+      <div class="d-card glass reveal">
+        <h3>项目背景</h3>
+        <p>运营每天要把活动报名商品整页复制到在线表格，再删掉一堆无用信息、抠出商品 ID。几百个链接纯手工作业，容易漏、容易错，且无法复核。</p>
+      </div>
+      <div class="d-card glass reveal">
+        <h3>核心难点</h3>
+        <p>每个商品 ID 只在页面渲染里出现，页面结构用了<b>带哈希的 CSS 类名</b>（如 <code>goods-info_id__2V2pq</code>），<b>每次平台发版都会变</b>，写死选择器早晚崩。而接口入参虽是明文 JSON，签名仍在请求头里，裸调会被挡。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">principle</div>
+      <h2>原则：读页面自己发的响应，不解析会变的类名</h2>
+      <p class="code-note">做法是"模拟人工点「查看」→ 监听它触发的接口响应 → 从 JSON 字段取值"，而不是解析 DOM 样式。要不要点、点哪里靠稳定的业务属性（卡片上的 <code>data-tracking-params</code>），取值靠接口字段名 —— 这两样才是平台"改版也不会随手改"的东西。</p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/scrape.py · 点动作 + 等它触发的响应</span>
+        </div>
+        <pre class="codewin-body"><code>def wait_for_api(page, action, timeout=45_000):
+    """执行 action（如点「查看」），并等它触发的列表接口响应。"""
+    with page.expect_response(lambda r: API_MARK in r.url, timeout=timeout) as info:
+        action()
+    return parse_list_response(info.value.text())   # 从 JSON 取 total / goods_items
+
+# 卡片 = 过滤条件，用稳定的业务属性精确匹配，而不是样式类
+want = f"activity_type={BAIYI_ACTIVITY_TYPE}&active_status={status}"   # 43=百亿补贴
+card = page.locator(f'[data-tracking-params="{want}"]')</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">pitfalls</div>
+      <h2>两个真实踩坑</h2>
+      <div class="d-grid" style="margin-top:16px">
+        <div class="d-card glass">
+          <h3>切标签：必须点"最深"的那个元素</h3>
+          <p>标签用模糊类名 <code>[class*="TAB_card"]</code> 匹配时，<b>外层容器也会命中</b>，而且它的文本里也含目标文字 → 点到容器上、标签切不动。做法是取文档顺序里最靠后的那个，点完再验证 <code>active</code> 状态。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>调大每页条数的"竞态"</h3>
+          <p>页面只给每页 10/20 条。点"每页条数"下拉项<b>本身会触发一次列表请求</b>——那次的响应会早到，导致后面再等响应就超时。做法是把"点下拉项"这个动作也包进"等响应"里，把它触发的数据一并吃掉。</p>
+        </div>
+      </div>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/scrape.py · 翻页的两道保护</span>
+        </div>
+        <pre class="codewin-body"><code># ① 翻页没生效：本页与上页 ID 完全相同 → 判定没翻动，停（防死循环）
+if new_ids == prev_ids: break
+# ② 风控：错误里含"频繁" → 停手提示"等 2 小时或改天"，已采到的照常输出
+if "频繁" in err: break
+# 采完比对：实际采到 vs 接口自报 total，对不上显式打印差多少（不假装正常）</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">dev tool</div>
+      <h2>配套：接口侦察脚本</h2>
+      <p class="code-note">字段名不能靠猜。随工程带一个侦察脚本：连上登录浏览器、把页面发出的 XHR/fetch 响应原样存盘，并打印每个接口的<b>顶层结构、列表条数、单条字段名</b>。<b>[逆向要点]</b> 平台改版时先跑它"以真实响应为准"再改取值，而不是对着报错瞎试。</p>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>python main.py                # 生效中 + 未生效，全量自动翻页</div>
+        <div><span class="o">[+] </span>生效中：共 285 条，实取 285 条 <span class="ok">[OK]</span></div>
+        <div><span class="o">[+] </span>输出 百亿补贴ID_日期_时间.xlsx（明细 + 去重汇总）</div>
+        <div><span class="p">$ </span>python tools/pdd_probe.py     # 改版时：抓 XHR 定字段名</div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">ai session</div>
+      <h2>我是怎么和 Claude 配合把它跑通的</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>先按教程解析 CSS 类名抓 ID → 类名带哈希，发版就变</div>
+        <div><span class="o">[+] </span>Claude 建议：读页面自己发的接口响应，按字段取值，不碰样式类 <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>切标签点不动 → 一起定位到"模糊匹配命中了外层容器"</div>
+        <div><span class="o">[+] </span>改取最深层元素 + 验证 active 状态 <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>顺手让 Claude 把"定字段名"也工具化 → 产出侦察脚本</div>
+      </div>
+      <div class="d-card glass" style="margin-top:16px">
+        <p><b>体会</b>：做数据采集，最稳的不是"找到能用的选择器"，而是<b>找到"平台改版也不会随手改"的抓点</b>——稳定的业务属性 + 接口字段名。AI 帮我快速验证哪条路更稳，但"以真实响应为准、不猜"是我坚持的。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找自动化 / RPA / AI 提效方向的机会</div>
+          <div style="margin-top:22px" class="reveal"><a class="cta" href="mailto:18975560804@163.com">联系我</a></div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> 电商自动化 · RPA · AI 驱动开发</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫 / RPA 工程师作品集</span>
+        <span><a href="../index.html" style="color:var(--dim)">← 返回首页</a></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+</body>
+</html>

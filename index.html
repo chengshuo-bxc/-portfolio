@@ -114,10 +114,10 @@
       <p>简历项目系统复现，全部真实数据跑通。点击项目进入详情页，可看真实核心算法代码。</p>
     </div>
 
-    <!-- 重点项目大卡 (置顶: 运营自动化 · 批量改价工具) -->
-    <a class="proj-featured glass reveal" href="projects/feiyan-pricing.html">
+    <!-- 重点项目大卡 (置顶: 电商自动化 · 批量改价工具) -->
+    <a class="proj-featured glass reveal" href="projects/pricing-automation.html">
       <div class="proj">
-        <div class="pname">飞鸭童装运营 · 批量改价自动化工具</div>
+        <div class="pname">童装品牌渠道 · 批量改价自动化工具</div>
         <div class="pdesc">面向童装品牌渠道服务（拼多多 + 天猫超市）的运营自动化：运营填「款号+调价规则」→ 秒级按双平台价格口径算价 + 自动拦截低于成本/破历史最低的"亏本改价" → 输出拼多多/猫超导入模板 + 异常标红汇总。配影刀后台上传手册 + 落地蓝图。</div>
         <div class="meta">
           <span>双平台价格口径</span>
@@ -137,7 +137,45 @@
       </div>
     </a>
 
-    <div class="group-tag reveal"><span>方向 · 爬虫 / 数据采集</span><b>01</b></div>
+    <div class="group-tag reveal"><span>方向 · 电商自动化 / 运营提效</span><b>01</b></div>
+
+    <!-- 电商自动化方向网格 -->
+    <div class="proj-grid">
+      <a class="proj-card glass tinted reveal" href="projects/overdue-orders.html">
+        <div class="pname">多平台发货超时订单自动提取</div>
+        <p class="pdesc">拼多多 + 京东双平台。不走运营"筛选→批量导出（5 分钟冷却）→下载→解压"，直接调接口；CDP 接管已登录浏览器借其签名，多店一店一浏览器隔离，一轮几秒出表。</p>
+        <div class="meta"><span>双平台</span><span>多店一轮数秒</span><span>CDP 接管</span></div>
+        <div class="tags"><span>Playwright</span><span>签名池</span><span>PyInstaller</span></div>
+        <div class="pterm"><div><span class="p">$ </span>批量提取 → 即将超/已超合并 + 纯订单号清单</div></div>
+        <div class="go">查看详情</div>
+      </a>
+      <a class="proj-card glass reveal" href="projects/price-monitor.html">
+        <div class="pname">多店铺价格监控与分级告警</div>
+        <p class="pdesc">盯住"活动中、未结束"的商品，用单件实收/报名价比货盘底线，破线即告警。签名池批量取数；分级告警（轻度群通知 → 重度加急+短信/电话）+ 已读闭环，同一条只报一次。</p>
+        <div class="meta"><span>签名池</span><span>分级告警</span><span>已读闭环</span></div>
+        <div class="tags"><span>多店</span><span>飞书</span><span>状态机</span></div>
+        <div class="pterm"><div><span class="p">$ </span>python main.py --console  # 本地网页控制台</div></div>
+        <div class="go">查看详情</div>
+      </a>
+      <a class="proj-card glass reveal" href="projects/activity-ids.html">
+        <div class="pname">电商活动报名商品 ID 自动提取</div>
+        <p class="pdesc">把运营"整页复制→删垃圾→手抠 ID"自动化：接管已登录浏览器，模拟点开活动卡片 + 自动翻页，从接口响应里精确取 ID。不解析会变味的哈希类名，随包附接口侦察工具。</p>
+        <div class="meta"><span>自动翻页去重</span><span>读接口响应</span><span>附侦察工具</span></div>
+        <div class="tags"><span>Playwright</span><span>expect_response</span><span>Python</span></div>
+        <div class="pterm"><div><span class="p">$ </span>python main.py  # 生效中+未生效 全量</div></div>
+        <div class="go">查看详情</div>
+      </a>
+      <a class="proj-card glass tinted reveal" href="projects/promotion-cleanup.html">
+        <div class="pname">推广链接批量管理浏览器扩展（MV3）</div>
+        <p class="pdesc">平台自带批量删有限制、人工逐条太慢。扩展替用户在页面上点删除 → 请求由页面自己发，每次新鲜签名、零风控。实测 62 条连删 0 失败、约 4.9 秒/条，附离线自检。</p>
+        <div class="meta"><span>模拟真人点击</span><span>零风控</span><span>MV3 MAIN world</span></div>
+        <div class="tags"><span>Chrome 扩展</span><span>postMessage RPC</span><span>Shadow DOM</span></div>
+        <div class="pterm"><div><span class="p">$ </span>npm test  # 8 项离线自检全绿</div></div>
+        <div class="go">查看详情</div>
+      </a>
+    </div>
+
+    <div class="group-tag reveal"><span>方向 · 爬虫 / 数据采集</span><b>02</b></div>
 
     <!-- 爬虫方向网格 -->
     <div class="proj-grid">
@@ -197,7 +235,7 @@
       </a>
     </div>
 
-    <div class="group-tag reveal"><span>方向 · RPA 流程自动化 / AI 提效</span><b>02</b></div>
+    <div class="group-tag reveal"><span>方向 · RPA 流程自动化 / AI 提效</span><b>03</b></div>
 
     <!-- RPA 方向网格 -->
     <div class="proj-grid">

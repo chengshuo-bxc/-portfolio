@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>多平台发货超时订单自动提取 · 电商自动化 · 程烁作品集</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<nav class="glass">
+  <div class="brand">
+    <span class="prompt">~/</span>
+    <span class="name">程烁</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-back" href="../index.html">← 返回首页</a>
+    <a class="cta" href="mailto:18975560804@163.com">联系我</a>
+  </div>
+</nav>
+
+<header class="d-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../index.html">首页</a> / 电商自动化 / 发货超时订单提取</div>
+    <h1>多平台发货超时订单自动提取</h1>
+    <p class="lede">电商运营每天要盯「快超出承诺发货时间的订单」，逾期会扣分罚款。原来的做法是人工「订单查询 → 待发货 → 快速筛选 → 批量导出 → 等后台生成（约 5 分钟冷却）→ 下载 → 解压 → 复制订单号」，多店重复、又慢又容易漏。<b>本工具直接调平台接口取数</b>，多店一轮几秒钟出表，输出「合并总表 + 纯订单号清单」直接喂给内部 ERP。</p>
+    <div class="meta">
+      <span>拼多多 + 京东双平台</span>
+      <span>多店一轮数秒</span>
+      <span>CDP 接管已登录浏览器</span>
+      <span>PyInstaller 一键交付</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="d-grid">
+      <div class="d-card glass reveal">
+        <h3>项目背景</h3>
+        <p>多家旗舰店的运营每天要把「发货即将超时 / 已超时」的订单捞出来，交给内部 ERP 查单处理。人工导出有 5 分钟冷却，多店反复操作极其低效，还可能漏掉跨页数据。</p>
+      </div>
+      <div class="d-card glass reveal">
+        <h3>核心难点</h3>
+        <p>平台订单接口校验请求头里的动态签名（<code>anti-content</code> / <code>dsm-*</code>），<b>用 requests 裸调会被网关挡掉</b>，返回的文案还伪装成「请求频繁，请2小时后重试」。硬碰硬逆向签名成本高、且平台随时改。</p>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">approach</div>
+      <h2>打法：接管真浏览器，借它自己的签名</h2>
+      <p class="code-note">不逆向签名。用 Playwright 通过 <b>CDP 接管用户已登录的 Chrome</b>，监听页面自己发出的请求，把签名截下来复用；一份签名会用几次就失效，所以做成「签名池」——用一份换一份、失败重试，全程不用点页面。</p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/browser_core.py · 接管已登录 Chrome</span>
+        </div>
+        <pre class="codewin-body"><code># 启动带调试端口的 Chrome（独立配置目录保存登录态），再 CDP 接管
+cmd = [chrome,
+  f"--remote-debugging-port={port}", "--remote-allow-origins=*",
+  f"--user-data-dir={profile_dir}", url]
+subprocess.Popen(cmd, creationflags=DETACHED_PROCESS)
+
+browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
+# ⚠ 为什么不 Playwright 自启：自启带自动化标记 navigator.webdriver=True，风控阈值更低；
+#    接管真 Chrome 则原生就是 False，什么都不用遮。</code></pre>
+      </div>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/overdue.py · 签名池</span>
+        </div>
+        <pre class="codewin-body"><code>class Signatures:
+    """监听页面流量，把带 anti-content 的请求签名收进池子，一次调用花一份。"""
+    def bind(self, page):
+        page.on("request", self._on_req)          # 页面自己发请求 → 天然带签名
+    def take(self):                               # 从新往旧取没用过的那一份
+        if self._used < len(self.items):
+            self._used += 1
+            return self.items[len(self.items) - self._used][1]
+        return None                               # 池子空了 → refill 刷新页面补货</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">multi-store</div>
+      <h2>多店隔离：一店一账号一浏览器一端口</h2>
+      <p class="code-note">登录态按浏览器配置目录存，所以每家店用独立目录 + 独立调试端口，互不顶号。<b>[逆向要点]</b> 端口必须<b>运行时顺序分配</b>、启动前先清同端口残留 —— 否则会把 A 店的数据当成 B 店的（踩过）。登录后还会<b>核对店名</b>，对不上就跳过报警。</p>
+      <div class="codewin glass" style="margin-top:16px">
+        <div class="codewin-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="fname">core/overdue.py · 防串店</span>
+        </div>
+        <pre class="codewin-body"><code># 登录后核对当前登录店名，与配置对不上 → 跳过（最后一道防串店闸）
+if cur and norm(st["name"]) not in norm(cur) and norm(cur) not in norm(st["name"]):
+    log(f"[!] 登录的店是「{cur}」，与配置「{st['name']}」不一致 → 跳过")
+    continue
+
+# 收尾：CDP 的 Browser.close 才是真关浏览器
+# （browser.close() 只断开连接、不关进程，会留一堆僵尸浏览器占端口）
+browser.new_browser_cdp_session().send("Browser.close")</code></pre>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">two platforms</div>
+      <h2>两个平台的差异</h2>
+      <div class="d-grid" style="margin-top:16px">
+        <div class="d-card glass">
+          <h3>拼多多</h3>
+          <p>请求头 <code>anti-content</code> 动态签名；筛选参数「即将超」和「已超」的 <code>delayShippingStatus / afterSaleType</code> <b>两个都不同</b>，照抄一个只改另一个会静默查出别的单（踩过）。<code>pageSize</code> 上限 20，「有没有下一页」的标志不可信。</p>
+        </div>
+        <div class="d-card glass">
+          <h3>京东</h3>
+          <p>靠复用页面请求的那组头（尤其 <code>dsm-eid</code>），缺了返回 <code>code=312</code>。返回字段是<b>嵌套</b>的（<code>order.predictedTime</code>），平铺取会拿到空。店名匹配用「最长公共子串 ≥ 4」防止撞车。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">delivery</div>
+      <h2>交付：给运营的"双击即用"</h2>
+      <p class="code-note">运营电脑没有 Python、不看命令行，所以交付物是 PyInstaller onedir 打包的 <code>exe + _internal</code> + 一键 <code>.bat</code>。咬过两个硬坑：打包后 <code>__file__</code> 指向 <code>_internal</code>（资源找不到、静默算错），以及 <code>.bat</code> 必须 <b>GBK + CRLF</b>（LF 会被 cmd 吞字符）。</p>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>双击 首次登录.bat   # 逐家店过一遍短信验证码（一次）</div>
+        <div><span class="p">$ </span>双击 提取发货快逾期.bat</div>
+        <div><span class="o">[+] </span>即将超 12 单 / 已超 3 单，1.1 秒（人工导出要等 5 分钟冷却）</div>
+        <div><span class="o">[+] </span>结果/发货快逾期_拼多多_日期.xlsx + 订单号_日期.txt <span class="ok">[OK]</span></div>
+      </div>
+    </div>
+
+    <div class="d-sec reveal">
+      <div class="k">ai session</div>
+      <h2>我是怎么和 Claude 配合把它跑通的</h2>
+      <div class="pterm" style="margin-top:16px">
+        <div><span class="p">$ </span>裸调订单接口 → 返回"当前请求频繁，请2小时后重试"</div>
+        <div><span class="o">[+] </span>Claude 判断这不是限流，是 anti-content 签名校验失败 → 转"借页面签名" <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>签名连用几次就失效 → 一起设计出"签名池"打法</div>
+        <div><span class="o">[+] </span>页面一次加载薅上百份签名，一次一换、失败重试 <span class="ok">[OK]</span></div>
+        <div><span class="p">$ </span>多店时数据串了 → 定位到端口按序号分配撞上残留浏览器</div>
+        <div><span class="o">[+] </span>改为运行时顺序分端口 + 启动前清端口 + 登录后核对店名 <span class="ok">[OK]</span></div>
+      </div>
+      <div class="d-card glass" style="margin-top:16px">
+        <p><b>体会</b>：这个项目最值钱的不是"跑通了"，而是那些<b>不报错的坑</b>——端口撞了会静默拿到别人数据、<code>__file__</code> 定位资源会静默算错、筛选参数抄错会静默查出别的单。AI 帮我把大段排错拆成小步，但每一步的"对不上就报错、绝不静默兜底"是我定的底线。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner glass">
+      <div class="foot-grid">
+        <div>
+          <div class="lead reveal">正在寻找自动化 / RPA / AI 提效方向的机会</div>
+          <div style="margin-top:22px" class="reveal"><a class="cta" href="mailto:18975560804@163.com">联系我</a></div>
+        </div>
+        <div class="foot-meta reveal">
+          <div><span class="k">邮箱</span> <a href="mailto:18975560804@163.com">18975560804@163.com</a></div>
+          <div><span class="k">电话</span> 18975560804</div>
+          <div><span class="k">方向</span> 电商自动化 · RPA · AI 驱动开发</div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>程烁 · 爬虫 / RPA 工程师作品集</span>
+        <span><a href="../index.html" style="color:var(--dim)">← 返回首页</a></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+</body>
+</html>
